@@ -1,0 +1,118 @@
+:root {
+  font-family: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  color: #1d2a22;
+  background: #dde7d5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  background: #253c2b;
+  color: #fffaf0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+button:hover {
+  background: #315a3d;
+}
+
+.game-shell {
+  display: grid;
+  grid-template-rows: auto minmax(430px, 1fr) auto;
+  gap: 14px;
+  min-height: 100vh;
+  padding: 18px;
+}
+
+.topbar,
+.controls {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  margin: 0 auto;
+  max-width: 1120px;
+  width: 100%;
+}
+
+h1 {
+  font-size: clamp(28px, 4vw, 46px);
+  line-height: 1;
+  margin: 0;
+  text-align: center;
+}
+
+.stage-wrap {
+  border: 1px solid #b9c9b2;
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgb(52 72 52 / 18%);
+  margin: 0 auto;
+  max-width: 1120px;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+#gameCanvas {
+  display: block;
+  height: 100%;
+  min-height: 430px;
+  width: 100%;
+}
+
+.left-badge {
+  background: rgb(255 250 240 / 88%);
+  border: 1px solid #c8d3c2;
+  border-radius: 8px;
+  left: 14px;
+  padding: 9px 12px;
+  position: absolute;
+  top: 14px;
+}
+
+.message {
+  align-items: center;
+  background: rgb(255 250 240 / 88%);
+  border: 1px solid #c8d3c2;
+  border-radius: 8px;
+  display: flex;
+  font-size: 34px;
+  font-weight: 800;
+  inset: 24px;
+  justify-content: center;
+  position: absolute;
+}
+
+.hidden {
+  display: none;
+}
+
+.controls {
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .game-shell {
+    grid-template-rows: auto minmax(360px, 1fr) auto;
+    padding: 12px;
+  }
+
+  #gameCanvas {
+    min-height: 360px;
+  }
+}

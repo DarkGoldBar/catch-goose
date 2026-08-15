@@ -75,6 +75,7 @@ let world;
 let bodies = [];
 let tray = [];
 let traySlots = [];
+let traySlotItems = createEmptyTraySlots();
 let removed = 0;
 let gameOver = false;
 let pointer = new THREE.Vector2();
@@ -238,6 +239,7 @@ async function restart() {
   bodies.forEach(({ mesh }) => scene.remove(mesh));
   bodies = [];
   tray = [];
+  traySlotItems = createEmptyTraySlots();
   removed = 0;
   gameOver = false;
   hideMessage();
@@ -568,16 +570,20 @@ function removeItemHighlight(item) {
 }
 
 function selectItem(item) {
-  if (tray.filter((entry) => entry.status !== 'gone').length >= traySize) return;
+  if (item.status !== 'active') return;
+  const slotIndex = findFirstOpenTraySlot();
+  if (slotIndex === -1) return;
   removeItemHighlight(item);
   if (hoveredItem === item) hoveredItem = null;
 
   item.status = 'movingToTray';
   world.removeRigidBody(item.body);
   item.body = null;
+  item.traySlotIndex = slotIndex;
+  traySlotItems[slotIndex] = item;
   tray.push(item);
   removed += 1;
-  moveItemToTray(item, tray.length - 1);
+  moveItemToTray(item, slotIndex);
   updateHud();
 }
 
@@ -597,20 +603,47 @@ function moveItemToTray(item, slotIndex) {
 }
 
 function layoutTray() {
-  tray.forEach((item, index) => {
-    if (item.status === 'tray') {
-      const target = getTraySlotPosition(index);
-      item.animation = {
-        kind: 'moveToSlot',
-        from: item.mesh.position.clone(),
-        to: new THREE.Vector3(target.x, target.y + 0.42, target.z),
-        fromQuaternion: item.mesh.quaternion.clone(),
-        toQuaternion: trayQuaternion.clone(),
-        startScale: item.mesh.scale.x,
-        endScale: item.baseScale * 0.82,
-        start: performance.now(),
-        duration: 220
-      };
+  traySlotItems.forEach((item, slotIndex) => {
+    if (item && (item.status === 'tray' || item.status === 'movingToTray')) {
+      moveItemToSlot(item, slotIndex, 220);
+    }
+  });
+}
+
+function createEmptyTraySlots() {
+  return Array.from({ length: traySize }, () => null);
+}
+
+function findFirstOpenTraySlot() {
+  return traySlotItems.findIndex((item) => item === null);
+}
+
+function moveItemToSlot(item, slotIndex, duration) {
+  const target = getTraySlotPosition(slotIndex);
+  item.traySlotIndex = slotIndex;
+  item.animation = {
+    kind: 'moveToSlot',
+    from: item.mesh.position.clone(),
+    to: new THREE.Vector3(target.x, target.y + 0.42, target.z),
+    fromQuaternion: item.mesh.quaternion.clone(),
+    toQuaternion: trayQuaternion.clone(),
+    startScale: item.mesh.scale.x,
+    endScale: item.baseScale * 0.82,
+    start: performance.now(),
+    duration
+  };
+}
+
+function compactTraySlots() {
+  const remaining = traySlotItems.filter((item) => item && item.status !== 'gone');
+  traySlotItems = createEmptyTraySlots();
+
+  remaining.forEach((item, slotIndex) => {
+    traySlotItems[slotIndex] = item;
+    if (item.traySlotIndex !== slotIndex || item.status === 'movingToTray') {
+      moveItemToSlot(item, slotIndex, 220);
+    } else {
+      item.traySlotIndex = slotIndex;
     }
   });
 }
@@ -642,13 +675,18 @@ function finishMatch(item) {
   item.status = 'gone';
   item.animation = null;
   scene.remove(item.mesh);
+  if (item.traySlotIndex != null && traySlotItems[item.traySlotIndex] === item) {
+    traySlotItems[item.traySlotIndex] = null;
+  }
   tray = tray.filter((entry) => entry.status !== 'gone');
-  layoutTray();
+  if (!tray.some((entry) => entry.status === 'matching')) {
+    compactTraySlots();
+  }
   checkEndState();
 }
 
 function checkEndState() {
-  const visibleTrayCount = tray.filter((entry) => entry.status !== 'gone').length;
+  const visibleTrayCount = traySlotItems.filter(Boolean).length;
   const animatingMatches = tray.some((entry) => entry.status === 'matching');
 
   if (removed === bodies.length && visibleTrayCount === 0 && !animatingMatches) {

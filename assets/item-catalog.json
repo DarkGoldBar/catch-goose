@@ -1,0 +1,55 @@
+{
+  "themes": [
+    {
+      "id": "farm-kitchen",
+      "name": "农场厨房",
+      "concept": "assets/concepts/farm-kitchen.png",
+      "items": [
+        { "id": "goose", "name": "大鹅", "model": "assets/models/farm-kitchen/goose.glb" },
+        { "id": "egg", "name": "鸡蛋", "model": "assets/models/farm-kitchen/egg.glb" },
+        { "id": "apple", "name": "苹果", "model": "assets/models/farm-kitchen/apple.glb" },
+        { "id": "carrot", "name": "胡萝卜", "model": "assets/models/farm-kitchen/carrot.glb" },
+        { "id": "corn", "name": "玉米", "model": "assets/models/farm-kitchen/corn.glb" },
+        { "id": "pumpkin", "name": "南瓜", "model": "assets/models/farm-kitchen/pumpkin.glb" },
+        { "id": "mushroom", "name": "蘑菇", "model": "assets/models/farm-kitchen/mushroom.glb" },
+        { "id": "bread", "name": "面包", "model": "assets/models/farm-kitchen/bread.glb" },
+        { "id": "milk-bottle", "name": "牛奶瓶", "model": "assets/models/farm-kitchen/milk-bottle.glb" }
+      ]
+    },
+    {
+      "id": "seaside-catch",
+      "name": "海边渔获",
+      "concept": "assets/concepts/seaside-catch.png",
+      "items": [
+        { "id": "fish", "name": "小鱼", "model": "assets/models/seaside-catch/fish.glb" },
+        { "id": "crab", "name": "螃蟹", "model": "assets/models/seaside-catch/crab.glb" },
+        { "id": "shell", "name": "贝壳", "model": "assets/models/seaside-catch/shell.glb" },
+        { "id": "starfish", "name": "海星", "model": "assets/models/seaside-catch/starfish.glb" },
+        { "id": "shrimp", "name": "虾", "model": "assets/models/seaside-catch/shrimp.glb" },
+        { "id": "octopus", "name": "章鱼", "model": "assets/models/seaside-catch/octopus.glb" },
+        { "id": "seaweed", "name": "海带", "model": "assets/models/seaside-catch/seaweed.glb" },
+        { "id": "pearl-clam", "name": "珍珠蚌", "model": "assets/models/seaside-catch/pearl-clam.glb" },
+        { "id": "message-bottle", "name": "漂流瓶", "model": "assets/models/seaside-catch/message-bottle.glb" }
+      ]
+    },
+    {
+      "id": "toy-clutter",
+      "name": "玩具杂物",
+      "concept": "assets/concepts/toy-clutter.png",
+      "items": [
+        { "id": "building-block", "name": "积木", "model": "assets/models/toy-clutter/building-block.glb" },
+        { "id": "toy-car", "name": "玩具车", "model": "assets/models/toy-clutter/toy-car.glb" },
+        { "id": "rubber-ball", "name": "皮球", "model": "assets/models/toy-clutter/rubber-ball.glb" },
+        { "id": "key", "name": "钥匙", "model": "assets/models/toy-clutter/key.glb" },
+        { "id": "alarm-clock", "name": "闹钟", "model": "assets/models/toy-clutter/alarm-clock.glb" },
+        { "id": "pencil", "name": "铅笔", "model": "assets/models/toy-clutter/pencil.glb" },
+        { "id": "gift-box", "name": "礼盒", "model": "assets/models/toy-clutter/gift-box.glb" },
+        { "id": "rubber-duck", "name": "鸭子玩具", "model": "assets/models/toy-clutter/rubber-duck.glb" },
+        { "id": "button", "name": "按钮", "model": "assets/models/toy-clutter/button.glb" }
+      ]
+    }
+  ],
+  "debugFallback": {
+    "note": "基础 low-poly 几何体仅用于 debug 或缺省回退；正式主题物品优先使用本清单里的 glb 模型。"
+  }
+}

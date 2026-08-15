@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import catalog from '../assets/item-catalog.json';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -16,6 +18,10 @@ app.innerHTML = `
     <section class="controls">
       <button id="shuffleBtn" type="button">晃一下</button>
       <button id="restartBtn" type="button">重新开始</button>
+      <label class="theme-picker" style="display:flex;align-items:center;gap:8px;color:#253c2b;font-weight:700;">
+        <span>模型类型</span>
+        <select id="themeSelect" aria-label="选择模型类型" style="min-height:44px;border:1px solid #aebda7;border-radius:8px;background:#fffaf0;color:#253c2b;padding:0 10px;font:inherit;"></select>
+      </label>
     </section>
   </main>
 `;
@@ -23,6 +29,13 @@ app.innerHTML = `
 const canvas = document.querySelector('#gameCanvas');
 const leftCountEl = document.querySelector('#leftCount');
 const messageEl = document.querySelector('#message');
+const themeSelect = document.querySelector('#themeSelect');
+const modelFiles = import.meta.glob('../assets/models/**/*.glb', { eager: true, import: 'default', query: '?url' });
+const modelUrlByCatalogPath = Object.fromEntries(
+  Object.entries(modelFiles).map(([path, url]) => [path.replace('../', ''), url])
+);
+const gltfLoader = new GLTFLoader();
+const modelCache = new Map();
 
 const traySize = 8;
 const cone = {
@@ -40,8 +53,9 @@ const trayConfig = {
   spacing: 0.82,
   slotSize: 0.68
 };
+const trayQuaternion = new THREE.Quaternion();
 
-const itemTypes = [
+const debugItemTypes = [
   { name: '鹅', color: 0xf8f2df, accent: 0xf0b33e, shape: 'goose' },
   { name: '苹果', color: 0xd9463e, accent: 0x7a3322, shape: 'sphere' },
   { name: '梨', color: 0xd7dc66, accent: 0x5a8c48, shape: 'pear' },
@@ -49,8 +63,10 @@ const itemTypes = [
   { name: '碗', color: 0x6aa5d8, accent: 0xffffff, shape: 'bowl' },
   { name: '木鱼', color: 0xb96f3c, accent: 0x60351f, shape: 'capsule' },
   { name: '萝卜', color: 0xfff4ea, accent: 0x58a75b, shape: 'carrot' },
-  { name: '金蛋', color: 0xf2c94c, accent: 0xfff0a8, shape: 'egg' }
+  { name: '金蛋', color: 0xf2c94c, accent: 0xfff0a8, shape: 'egg' },
+  { name: '方块', color: 0x7c5cff, accent: 0xf6d365, shape: 'box' }
 ];
+let itemTypes = [];
 
 let renderer;
 let scene;
@@ -72,7 +88,7 @@ start();
 async function start() {
   await RAPIER.init();
   init();
-  restart();
+  await restart();
   requestAnimationFrame(tick);
 }
 
@@ -103,6 +119,7 @@ function init() {
 
   createInvisibleShadowReceiver();
   createTraySlots();
+  setupThemePicker();
 
   window.addEventListener('resize', resize);
   canvas.addEventListener('pointermove', onPointerMove);
@@ -112,6 +129,17 @@ function init() {
   document.querySelector('#restartBtn').addEventListener('click', restart);
   document.querySelector('#shuffleBtn').addEventListener('click', shakeCone);
   resize();
+}
+
+function setupThemePicker() {
+  const options = [
+    { id: 'debug', name: 'Debug 低模' },
+    ...catalog.themes.map((theme) => ({ id: theme.id, name: theme.name }))
+  ];
+  themeSelect.innerHTML = options
+    .map((option) => `<option value="${option.id}">${option.name}</option>`)
+    .join('');
+  themeSelect.value = catalog.themes[0]?.id || 'debug';
 }
 
 function createInvisibleShadowReceiver() {
@@ -204,7 +232,7 @@ function createPhysics() {
   );
 }
 
-function restart() {
+async function restart() {
   setHighlightedItem(null);
   pressedItem = null;
   bodies.forEach(({ mesh }) => scene.remove(mesh));
@@ -213,6 +241,7 @@ function restart() {
   removed = 0;
   gameOver = false;
   hideMessage();
+  itemTypes = getSelectedItemTypes();
   createPhysics();
 
   const deck = [];
@@ -221,19 +250,35 @@ function restart() {
   });
   deck.sort(() => Math.random() - 0.5);
 
-  deck.forEach((typeIndex, index) => {
+  for (const [index, typeIndex] of deck.entries()) {
     const y = 2.6 + index * 0.035;
     const point = randomPointInCircle(radiusAtY(y) - 0.75);
-    createItem(typeIndex, point.x, y, point.z);
-  });
+    await createItem(typeIndex, point.x, y, point.z);
+  }
 
   layoutTray();
   updateHud();
 }
 
-function createItem(typeIndex, x, y, z) {
+function getSelectedItemTypes() {
+  if (themeSelect.value === 'debug') return debugItemTypes;
+  const theme = catalog.themes.find((entry) => entry.id === themeSelect.value) || catalog.themes[0];
+  return theme.items.map((item, index) => {
+    const fallback = debugItemTypes[index % debugItemTypes.length];
+    return {
+      id: item.id,
+      name: item.name,
+      color: fallback.color,
+      accent: fallback.accent,
+      shape: fallback.shape,
+      modelUrl: modelUrlByCatalogPath[item.model]
+    };
+  });
+}
+
+async function createItem(typeIndex, x, y, z) {
   const type = itemTypes[typeIndex];
-  const mesh = makeMesh(type);
+  const mesh = await makeMesh(type);
   mesh.position.set(x, y, z);
   mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
   mesh.userData.typeIndex = typeIndex;
@@ -255,17 +300,26 @@ function createItem(typeIndex, x, y, z) {
     body
   );
 
-  bodies.push({
+  const item = {
     mesh,
     body,
     typeIndex,
     status: 'active',
     baseScale: mesh.scale.x,
     animation: null
-  });
+  };
+  bindItemInteraction(item);
+  bodies.push(item);
 }
 
-function makeMesh(type) {
+async function makeMesh(type) {
+  if (type.modelUrl) {
+    try {
+      return await makeModelMesh(type);
+    } catch (error) {
+      console.warn(`Failed to load model for ${type.name}; using debug fallback.`, error);
+    }
+  }
   const group = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({ color: type.color, roughness: 0.58, metalness: 0.03 });
   const accent = new THREE.MeshStandardMaterial({ color: type.accent, roughness: 0.7 });
@@ -331,6 +385,67 @@ function makeMesh(type) {
   return group;
 }
 
+async function makeModelMesh(type) {
+  let template = modelCache.get(type.modelUrl);
+  if (!template) {
+    const gltf = await gltfLoader.loadAsync(type.modelUrl);
+    template = normalizeModelTemplate(gltf.scene);
+    modelCache.set(type.modelUrl, template);
+  }
+
+  const clone = template.clone(true);
+  clone.name = type.name;
+  clone.scale.setScalar(0.82);
+  clone.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+  return clone;
+}
+
+function normalizeModelTemplate(model) {
+  model.updateMatrixWorld(true);
+  const box = getVertexBoundsInRootSpace(model);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  const largest = Math.max(size.x, size.y, size.z) || 1;
+
+  const root = new THREE.Group();
+  root.name = model.name || 'centered-model';
+  model.position.sub(center);
+  root.add(model);
+  root.scale.setScalar(0.9 / largest);
+  root.updateMatrixWorld(true);
+  return root;
+}
+
+function getVertexBoundsInRootSpace(model) {
+  const box = new THREE.Box3();
+  const vertex = new THREE.Vector3();
+  const rootInverse = model.matrixWorld.clone().invert();
+  let hasVertices = false;
+
+  model.traverse((child) => {
+    if (!child.isMesh || !child.geometry?.attributes?.position) return;
+    const positions = child.geometry.attributes.position;
+
+    for (let i = 0; i < positions.count; i += 1) {
+      vertex
+        .fromBufferAttribute(positions, i)
+        .applyMatrix4(child.matrixWorld)
+        .applyMatrix4(rootInverse);
+      box.expandByPoint(vertex);
+      hasVertices = true;
+    }
+  });
+
+  return hasVertices ? box : new THREE.Box3().setFromObject(model);
+}
+
 function onPointerMove(event) {
   if (gameOver) return;
   setHighlightedItem(getPointerItem(event));
@@ -368,13 +483,31 @@ function getPointerItem(event) {
   pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
 
-  const activeMeshes = bodies.filter((item) => item.status === 'active').map((item) => item.mesh);
-  const hits = raycaster.intersectObjects(activeMeshes, true);
-  if (!hits.length) return null;
+  const activeItems = bodies.filter((item) => item.status === 'active');
+  const hits = raycaster.intersectObjects(activeItems.map((item) => item.mesh), true);
 
-  let target = hits[0].object;
-  while (target.parent && !target.userData.name) target = target.parent;
-  return bodies.find((entry) => entry.mesh === target && entry.status === 'active') || null;
+  for (const hit of hits) {
+    const item = getItemFromObject(hit.object);
+    if (item) return item;
+  }
+  return null;
+}
+
+function bindItemInteraction(item) {
+  item.mesh.userData.item = item;
+  item.mesh.traverse((child) => {
+    child.userData.item = item;
+  });
+}
+
+function getItemFromObject(object) {
+  let target = object;
+  while (target) {
+    const item = target.userData?.item;
+    if (item?.status === 'active') return item;
+    target = target.parent;
+  }
+  return null;
 }
 
 function setHighlightedItem(item) {
@@ -403,18 +536,18 @@ function addItemHighlight(item) {
   const overlay = new THREE.Group();
   const outline = new THREE.Group();
 
-  item.mesh.children.forEach((child) => {
+  item.mesh.updateMatrixWorld(true);
+  const inverseRoot = item.mesh.matrixWorld.clone().invert();
+  item.mesh.traverse((child) => {
     if (!child.isMesh) return;
     const overlayMesh = new THREE.Mesh(child.geometry, overlayMaterial);
-    overlayMesh.position.copy(child.position);
-    overlayMesh.quaternion.copy(child.quaternion);
-    overlayMesh.scale.copy(child.scale);
+    overlayMesh.matrixAutoUpdate = false;
+    overlayMesh.matrix.copy(inverseRoot).multiply(child.matrixWorld);
     overlay.add(overlayMesh);
 
     const outlineMesh = new THREE.Mesh(child.geometry, outlineMaterial);
-    outlineMesh.position.copy(child.position);
-    outlineMesh.quaternion.copy(child.quaternion);
-    outlineMesh.scale.copy(child.scale);
+    outlineMesh.matrixAutoUpdate = false;
+    outlineMesh.matrix.copy(inverseRoot).multiply(child.matrixWorld);
     outline.add(outlineMesh);
   });
 
@@ -454,6 +587,8 @@ function moveItemToTray(item, slotIndex) {
     kind: 'moveToTray',
     from: item.mesh.position.clone(),
     to: new THREE.Vector3(target.x, target.y + 0.42, target.z),
+    fromQuaternion: item.mesh.quaternion.clone(),
+    toQuaternion: trayQuaternion.clone(),
     startScale: item.mesh.scale.x,
     endScale: item.baseScale * 0.82,
     start: performance.now(),
@@ -469,6 +604,8 @@ function layoutTray() {
         kind: 'moveToSlot',
         from: item.mesh.position.clone(),
         to: new THREE.Vector3(target.x, target.y + 0.42, target.z),
+        fromQuaternion: item.mesh.quaternion.clone(),
+        toQuaternion: trayQuaternion.clone(),
         startScale: item.mesh.scale.x,
         endScale: item.baseScale * 0.82,
         start: performance.now(),
@@ -555,9 +692,10 @@ function updateAnimation(item, now) {
 
   if (item.animation.kind === 'moveToTray' || item.animation.kind === 'moveToSlot') {
     item.mesh.position.lerpVectors(item.animation.from, item.animation.to, eased);
+    item.mesh.quaternion.slerpQuaternions(item.animation.fromQuaternion, item.animation.toQuaternion, eased);
     item.mesh.scale.setScalar(THREE.MathUtils.lerp(item.animation.startScale, item.animation.endScale, eased));
-    item.mesh.rotation.y += 0.08;
     if (progress >= 1) {
+      item.mesh.quaternion.copy(item.animation.toQuaternion);
       item.status = 'tray';
       item.animation = null;
       checkMatches();
@@ -696,3 +834,4 @@ function resize() {
   });
   layoutTray();
 }
+

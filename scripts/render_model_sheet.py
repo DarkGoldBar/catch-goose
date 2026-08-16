@@ -31,6 +31,17 @@ THEME_ORDERS = {
         "pearl-clam",
         "message-bottle",
     ],
+    "farm-kitchen": [
+        "goose",
+        "egg",
+        "apple",
+        "carrot",
+        "corn",
+        "pumpkin",
+        "mushroom",
+        "bread",
+        "milk-bottle",
+    ],
 }
 
 
@@ -108,11 +119,13 @@ def main():
 
     clear_scene()
     add_scene()
-    spacing = 1.55
+    spacing = 1.75 if args.theme == "farm-kitchen" else 1.55
     for index, slug in enumerate(THEME_ORDERS[args.theme]):
         row, col = divmod(index, 3)
         loc = ((col - 1) * spacing, (1 - row) * spacing, 0.45)
         import_item(ROOT / "assets" / "models" / args.theme / f"{slug}.glb", loc)
+    if args.theme == "farm-kitchen":
+        bpy.context.scene.camera.data.ortho_scale = 5.2
 
     bpy.context.scene.render.engine = "BLENDER_EEVEE"
     bpy.context.scene.render.resolution_x = 1200

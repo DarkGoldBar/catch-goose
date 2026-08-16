@@ -195,65 +195,82 @@ def add_eye(mats, x, y, z):
 
 
 def build_goose(m):
-    ico("body", (0, 0, 0.22), (0.42, 0.28, 0.24), m["white"])
-    ico("neck", (0.23, 0, 0.52), (0.14, 0.12, 0.35), m["white"])
-    ico("head", (0.32, 0, 0.82), (0.17, 0.14, 0.14), m["white"])
-    cone("beak", (0.52, 0, 0.82), 0.08, 0.02, 0.22, m["orange"], rotation=(0, math.pi / 2, 0))
-    add_eye(m, 0.37, -0.09, 0.88)
-    add_eye(m, 0.37, 0.09, 0.88)
-    cube("left foot", (0.16, -0.16, -0.03), (0.18, 0.09, 0.03), m["orange"])
-    cube("right foot", (0.16, 0.16, -0.03), (0.18, 0.09, 0.03), m["orange"])
+    ico("large white goose body", (-0.05, 0, 0.3), (0.42, 0.28, 0.25), m["white"], 2)
+    ico("raised tail feathers", (-0.43, 0, 0.4), (0.17, 0.24, 0.16), m["white"], 1)
+    ico("folded left wing", (-0.12, -0.23, 0.34), (0.25, 0.055, 0.16), m["cream"], 1)
+    ico("folded right wing", (-0.12, 0.23, 0.34), (0.25, 0.055, 0.16), m["cream"], 1)
+    ico("tall curved neck", (0.22, 0, 0.62), (0.14, 0.12, 0.34), m["white"], 2)
+    ico("round goose head", (0.31, 0, 0.88), (0.18, 0.15, 0.15), m["white"], 2)
+    cone("flat orange beak", (0.49, 0, 0.86), 0.075, 0.02, 0.23, m["orange"], vertices=5, rotation=(0, math.pi / 2, 0))
+    rounded_cube("beak groove", (0.53, -0.002, 0.87), (0.055, 0.01, 0.012), m["black"], bevel=0.003, segments=1)
+    add_eye(m, 0.35, -0.11, 0.93)
+    add_eye(m, 0.35, 0.11, 0.93)
+    for y in (-0.12, 0.12):
+        cyl("orange goose leg", (0.04, y, 0.03), 0.025, 0.18, m["orange"], vertices=8)
+        rounded_cube("webbed foot", (0.13, y, -0.06), (0.22, 0.11, 0.035), m["orange"], (0, 0, 0.05 if y > 0 else -0.05), 0.015, 1)
 
 
 def build_egg(m):
-    ico("egg", (0, 0, 0.32), (0.32, 0.32, 0.45), m["cream"], 2)
+    ico("low poly tan egg", (0, 0, 0.36), (0.31, 0.31, 0.43), m["cream"], 3)
+    ico("warm egg shadow side", (-0.08, -0.08, 0.25), (0.17, 0.12, 0.18), m["white"], 1)
 
 
 def build_apple(m):
-    ico("apple", (0, 0, 0.33), (0.38, 0.38, 0.34), m["red"])
-    cyl("stem", (0, 0, 0.72), 0.04, 0.24, m["brown"], vertices=8)
-    add_leaf(m, (0.13, 0, 0.78), (0.16, 0.04, 0.08), (0, 0.4, 0.35))
+    ico("faceted red apple", (0, 0, 0.36), (0.38, 0.36, 0.34), m["red"], 2)
+    ico("lower apple bulge", (0, 0, 0.22), (0.32, 0.31, 0.16), m["red"], 1)
+    cyl("brown apple stem", (0.02, 0, 0.73), 0.045, 0.24, m["brown"], vertices=8)
+    rounded_cube("green apple leaf", (0.18, 0, 0.78), (0.22, 0.08, 0.09), m["green"], (0.1, 0.5, 0.2), 0.025, 2)
+    ico("apple highlight patch", (-0.13, -0.18, 0.45), (0.08, 0.035, 0.06), m["orange"], 1)
 
 
 def build_carrot(m):
-    cone("root", (0, 0, 0.28), 0.18, 0.04, 0.82, m["orange"], rotation=(0, math.pi / 2, 0))
-    for y in (-0.12, 0, 0.12):
-        add_leaf(m, (-0.43, y, 0.45), (0.2, 0.035, 0.06), (0.25, 0.1, y * 2))
+    cone("tapered carrot root", (0, 0, 0.28), 0.19, 0.035, 0.82, m["orange"], vertices=12, rotation=(0, math.pi / 2, 0))
+    for x in (-0.12, 0.08, 0.28):
+        rounded_cube("carrot groove", (x, -0.16, 0.36 - x * 0.12), (0.12, 0.012, 0.018), m["gold"], (0, 0, -0.35), 0.004, 1)
+    for i, y in enumerate([-0.16, -0.05, 0.07, 0.18]):
+        rounded_cube("leafy carrot top", (-0.43, y, 0.45 + i * 0.02), (0.28, 0.065, 0.08), m["green"], (0.25, 0.25, y * 2.2), 0.025, 2)
 
 
 def build_corn(m):
-    cyl("cob", (0, 0, 0.3), 0.18, 0.78, m["yellow"], vertices=14, rotation=(0, math.pi / 2, 0))
-    for i in range(5):
-        x = -0.25 + i * 0.13
-        for y in (-0.11, 0, 0.11):
-            ico("kernel", (x, y, 0.48), (0.04, 0.035, 0.035), m["gold"], 1)
-    cube("left husk", (0, -0.22, 0.28), (0.36, 0.05, 0.12), m["green"], (0, 0.25, 0.25))
-    cube("right husk", (0, 0.22, 0.28), (0.36, 0.05, 0.12), m["green"], (0, 0.25, -0.25))
+    cyl("yellow corn cob core", (0, 0, 0.32), 0.18, 0.78, m["yellow"], vertices=16, rotation=(0, math.pi / 2, 0))
+    for i in range(7):
+        x = -0.3 + i * 0.1
+        for j, y in enumerate([-0.11, -0.035, 0.04, 0.115]):
+            ico("square corn kernel", (x, y, 0.48 - abs(y) * 0.25), (0.04, 0.035, 0.035), m["gold"] if (i + j) % 2 else m["yellow"], 1)
+    rounded_cube("left green husk", (-0.05, -0.22, 0.28), (0.72, 0.08, 0.16), m["green"], (0.05, 0.25, 0.28), 0.035, 2)
+    rounded_cube("right green husk", (-0.05, 0.22, 0.28), (0.72, 0.08, 0.16), m["green"], (0.05, 0.25, -0.28), 0.035, 2)
+    rounded_cube("bottom husk nub", (-0.44, 0, 0.2), (0.12, 0.14, 0.12), m["green"], bevel=0.025, segments=2)
 
 
 def build_pumpkin(m):
-    for x in (-0.22, 0, 0.22):
-        ico("pumpkin lobe", (x, 0, 0.32), (0.25, 0.38, 0.3), m["orange"])
-    cyl("stem", (0, 0, 0.68), 0.07, 0.26, m["green"], vertices=8)
+    for i in range(8):
+        angle = i * math.tau / 8
+        ico("faceted pumpkin lobe", (math.cos(angle) * 0.12, math.sin(angle) * 0.08, 0.34), (0.2, 0.3, 0.27), m["orange"], 1)
+    ico("pumpkin center mass", (0, 0, 0.33), (0.35, 0.35, 0.27), m["orange"], 2)
+    cone("green curved stem", (0.02, 0, 0.68), 0.08, 0.045, 0.25, m["green"], vertices=8)
+    ico("pumpkin highlight", (-0.16, -0.18, 0.45), (0.08, 0.035, 0.055), m["gold"], 1)
 
 
 def build_mushroom(m):
-    cyl("stem", (0, 0, 0.2), 0.15, 0.38, m["cream"], vertices=10)
-    ico("cap", (0, 0, 0.52), (0.42, 0.42, 0.18), m["red"])
-    for x, y in [(-0.15, -0.08), (0.12, 0.12), (0.05, -0.18)]:
-        ico("spot", (x, y, 0.68), (0.07, 0.07, 0.02), m["white"], 1)
+    cyl("chunky mushroom stem", (0, 0, 0.2), 0.14, 0.38, m["cream"], vertices=10)
+    ico("broad red mushroom cap", (0, 0, 0.52), (0.43, 0.4, 0.18), m["red"], 2)
+    ico("cream cap underside", (0, 0, 0.39), (0.33, 0.27, 0.045), m["cream"], 1)
+    for x, y, s in [(-0.17, -0.1, 0.07), (0.13, 0.12, 0.06), (0.04, -0.2, 0.075), (0.22, -0.04, 0.05), (-0.03, 0.19, 0.055)]:
+        ico("white mushroom spot", (x, y, 0.66), (s, s, 0.025), m["white"], 1)
 
 
 def build_bread(m):
-    ico("loaf", (0, 0, 0.25), (0.48, 0.28, 0.22), m["brown"])
-    for x in (-0.22, 0, 0.22):
-        cube("score", (x, -0.01, 0.46), (0.07, 0.31, 0.015), m["cream"], (0, 0, 0.55), 0.01)
+    ico("rounded bread loaf", (0, 0, 0.28), (0.48, 0.28, 0.2), m["brown"], 2)
+    rounded_cube("flat loaf base", (0, 0, 0.12), (0.78, 0.38, 0.08), m["brown"], bevel=0.04, segments=2)
+    for x in (-0.24, 0, 0.24):
+        rounded_cube("cream bread score", (x, -0.025, 0.44), (0.08, 0.27, 0.03), m["cream"], (0, 0, 0.55), 0.014, 1)
 
 
 def build_milk_bottle(m):
-    cyl("bottle", (0, 0, 0.34), 0.22, 0.64, m["white"], vertices=12)
-    cyl("neck", (0, 0, 0.76), 0.14, 0.24, m["white"], vertices=12)
-    cyl("cap", (0, 0, 0.93), 0.17, 0.1, m["blue"], vertices=12)
+    bevelled_cylinder("faceted milk bottle body", (0, 0, 0.34), 0.22, 0.62, m["white"], vertices=12, bevel=0.018)
+    bevelled_cylinder("narrow milk neck", (0, 0, 0.72), 0.145, 0.22, m["white"], vertices=12, bevel=0.014)
+    bevelled_cylinder("blue bottle cap", (0, 0, 0.89), 0.18, 0.11, m["blue"], vertices=16, bevel=0.012)
+    rounded_cube("subtle bottle label", (0, -0.205, 0.4), (0.22, 0.012, 0.2), m["cream"], bevel=0.01, segments=1)
 
 
 def build_fish(m):

@@ -1,5 +1,7 @@
+import argparse
 import math
 import os
+import sys
 from pathlib import Path
 
 import bpy
@@ -101,12 +103,73 @@ def cube(name, loc, scale, material, rotation=(0, 0, 0), bevel=0.03):
     return obj
 
 
+def rounded_cube(name, loc, scale, material, rotation=(0, 0, 0), bevel=0.04, segments=2):
+    obj = cube(name, loc, scale, material, rotation, bevel=0)
+    if bevel:
+        modifier = obj.modifiers.new("rounded bevel", "BEVEL")
+        modifier.width = bevel
+        modifier.segments = segments
+        modifier.affect = "EDGES"
+        obj.modifiers.new("weighted normals", "WEIGHTED_NORMAL")
+    return obj
+
+
 def torus(name, loc, major, minor, material, rotation=(0, 0, 0), segments=16):
     bpy.ops.mesh.primitive_torus_add(major_segments=segments, minor_segments=6, location=loc, major_radius=major, minor_radius=minor, rotation=rotation)
     obj = bpy.context.object
     obj.name = name
     assign(obj, material)
     return obj
+
+
+def bevelled_cylinder(name, loc, radius, depth, material, vertices=32, rotation=(0, 0, 0), bevel=0.015):
+    obj = cyl(name, loc, radius, depth, material, vertices=vertices, rotation=rotation)
+    if bevel:
+        modifier = obj.modifiers.new("edge bevel", "BEVEL")
+        modifier.width = bevel
+        modifier.segments = 2
+        obj.modifiers.new("weighted normals", "WEIGHTED_NORMAL")
+    return obj
+
+
+def mesh_obj(name, verts, faces, material):
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    assign(obj, material)
+    return obj
+
+
+def spherical_patch(name, loc, radius, phi0, phi1, material, lat_steps=9, lon_steps=3):
+    verts = []
+    faces = []
+    for i in range(lat_steps + 1):
+        theta = math.pi * i / lat_steps
+        for j in range(lon_steps + 1):
+            phi = phi0 + (phi1 - phi0) * j / lon_steps
+            verts.append(
+                (
+                    loc[0] + radius * math.sin(theta) * math.cos(phi),
+                    loc[1] + radius * math.sin(theta) * math.sin(phi),
+                    loc[2] + radius * math.cos(theta),
+                )
+            )
+    row = lon_steps + 1
+    for i in range(lat_steps):
+        for j in range(lon_steps):
+            a = i * row + j
+            faces.append((a, a + 1, a + row + 1, a + row))
+    obj = mesh_obj(name, verts, faces, material)
+    obj.modifiers.new("segment normals", "WEIGHTED_NORMAL")
+    return obj
+
+
+def clock_tick(mats, angle, radius=0.235, length=0.045, width=0.01):
+    x = math.sin(angle) * radius
+    z = 0.32 + math.cos(angle) * radius
+    return cube("clock tick", (x, -0.151, z), (width, 0.012, length), mats["red"], (0, angle, 0), 0.004)
 
 
 def make_materials():
@@ -250,70 +313,109 @@ def build_message_bottle(m):
 
 
 def build_building_block(m):
-    cube("block", (0, 0, 0.28), (0.42, 0.42, 0.28), m["blue"], bevel=0.06)
+    rounded_cube("blue block body", (0, 0, 0.28), (0.82, 0.82, 0.56), m["blue"], bevel=0.045, segments=3)
+    rounded_cube("yellow side panel", (-0.43, 0, 0.28), (0.04, 0.79, 0.51), m["yellow"], bevel=0.018, segments=2)
+    rounded_cube("red top plate", (0, 0, 0.595), (0.79, 0.79, 0.07), m["red"], bevel=0.025, segments=2)
     for x in (-0.16, 0.16):
         for y in (-0.16, 0.16):
-            cyl("stud", (x, y, 0.6), 0.09, 0.08, m["red"], vertices=12)
+            bevelled_cylinder("round stud", (x, y, 0.67), 0.09, 0.08, m["red"], vertices=32, bevel=0.012)
 
 
 def build_toy_car(m):
-    cube("body", (0, 0, 0.22), (0.5, 0.26, 0.14), m["blue"], bevel=0.06)
-    cube("cab", (0.08, 0, 0.42), (0.26, 0.22, 0.16), m["blue"], bevel=0.04)
-    for x in (-0.28, 0.28):
-        for y in (-0.18, 0.18):
-            cyl("wheel", (x, y, 0.12), 0.09, 0.05, m["black"], vertices=12, rotation=(math.pi / 2, 0, 0))
+    rounded_cube("lower chassis", (0, 0, 0.18), (0.86, 0.35, 0.22), m["blue"], bevel=0.045, segments=3)
+    rounded_cube("front hood", (0.23, 0, 0.34), (0.42, 0.32, 0.18), m["blue"], bevel=0.035, segments=2)
+    rounded_cube("rear body", (-0.24, 0, 0.34), (0.32, 0.32, 0.18), m["blue"], bevel=0.035, segments=2)
+    rounded_cube("tall cabin", (-0.06, 0, 0.55), (0.36, 0.30, 0.26), m["blue"], bevel=0.04, segments=2)
+    rounded_cube("front windshield", (0.12, -0.161, 0.55), (0.15, 0.012, 0.11), m["light_blue"], (0.18, 0, 0), 0.012, 2)
+    rounded_cube("side window left", (-0.08, -0.165, 0.56), (0.12, 0.012, 0.095), m["light_blue"], bevel=0.012, segments=2)
+    rounded_cube("side window right", (-0.08, 0.165, 0.56), (0.12, 0.012, 0.095), m["light_blue"], bevel=0.012, segments=2)
+    rounded_cube("front bumper", (0.45, 0, 0.19), (0.035, 0.37, 0.05), m["metal"], bevel=0.015, segments=2)
+    for y in (-0.105, 0.105):
+        bevelled_cylinder("headlight", (0.47, y, 0.30), 0.035, 0.018, m["white"], vertices=20, rotation=(0, math.pi / 2, 0), bevel=0.006)
+    for x in (-0.29, 0.29):
+        for y in (-0.19, 0.19):
+            bevelled_cylinder("black tire", (x, y, 0.11), 0.095, 0.055, m["black"], vertices=28, rotation=(math.pi / 2, 0, 0), bevel=0.012)
+            bevelled_cylinder("silver hub", (x, y * 1.01, 0.11), 0.052, 0.062, m["white"], vertices=24, rotation=(math.pi / 2, 0, 0), bevel=0.006)
 
 
 def build_rubber_ball(m):
-    ico("ball", (0, 0, 0.34), (0.36, 0.36, 0.36), m["red"])
-    for angle, material in [(0, m["blue"]), (math.pi / 2, m["yellow"]), (math.pi / 4, m["purple"])]:
-        cube("stripe", (0, 0, 0.37), (0.04, 0.39, 0.39), material, (0, 0, angle), 0.01)
+    colors = [m["red"], m["yellow"], m["green"], m["blue"], m["blue"], m["purple"]]
+    for i, material in enumerate(colors):
+        phi0 = i * math.tau / len(colors)
+        phi1 = (i + 1) * math.tau / len(colors)
+        spherical_patch("colored beach ball panel", (0, 0, 0.38), 0.36, phi0, phi1, material)
+    bevelled_cylinder("white top cap", (0, 0, 0.74), 0.095, 0.035, m["white"], vertices=32, bevel=0.008)
 
 
 def build_key(m):
-    torus("ring", (0.26, 0, 0.25), 0.16, 0.035, m["gold"], segments=18)
-    cube("shaft", (-0.08, 0, 0.25), (0.34, 0.055, 0.035), m["gold"], bevel=0.02)
-    cube("tooth one", (-0.32, -0.05, 0.2), (0.07, 0.05, 0.05), m["gold"], bevel=0.01)
-    cube("tooth two", (-0.22, -0.05, 0.2), (0.05, 0.05, 0.05), m["gold"], bevel=0.01)
+    bevelled_cylinder("round key head", (0.23, 0, 0.25), 0.21, 0.07, m["gold"], vertices=48, bevel=0.012)
+    bevelled_cylinder("dark key hole", (0.23, 0, 0.295), 0.092, 0.076, m["black"], vertices=36, bevel=0.006)
+    rounded_cube("long key shaft", (-0.15, 0, 0.25), (0.52, 0.07, 0.05), m["gold"], bevel=0.018, segments=2)
+    rounded_cube("raised shaft ridge", (-0.14, 0.043, 0.295), (0.42, 0.014, 0.014), m["metal"], bevel=0.004, segments=1)
+    rounded_cube("big tooth", (-0.43, -0.065, 0.205), (0.08, 0.055, 0.045), m["gold"], bevel=0.01, segments=1)
+    rounded_cube("middle tooth", (-0.34, -0.065, 0.205), (0.07, 0.05, 0.045), m["gold"], bevel=0.01, segments=1)
+    rounded_cube("small tooth", (-0.25, -0.055, 0.21), (0.055, 0.04, 0.04), m["gold"], bevel=0.008, segments=1)
 
 
 def build_alarm_clock(m):
-    cyl("face", (0, 0, 0.32), 0.34, 0.14, m["red"], vertices=16, rotation=(math.pi / 2, 0, 0))
-    cyl("dial", (0, -0.08, 0.32), 0.25, 0.04, m["white"], vertices=16, rotation=(math.pi / 2, 0, 0))
-    cube("hand one", (0.06, -0.12, 0.36), (0.02, 0.02, 0.16), m["black"], (0.8, 0, 0), 0.01)
-    cube("hand two", (-0.05, -0.12, 0.31), (0.02, 0.02, 0.12), m["black"], (0, 0, 0.6), 0.01)
-    ico("bell left", (-0.22, 0, 0.66), (0.13, 0.11, 0.08), m["yellow"], 1)
-    ico("bell right", (0.22, 0, 0.66), (0.13, 0.11, 0.08), m["yellow"], 1)
+    bevelled_cylinder("red outer case", (0, 0, 0.32), 0.35, 0.16, m["red"], vertices=48, rotation=(math.pi / 2, 0, 0), bevel=0.018)
+    bevelled_cylinder("cream clock face", (0, -0.095, 0.32), 0.27, 0.035, m["white"], vertices=48, rotation=(math.pi / 2, 0, 0), bevel=0.006)
+    for i in range(12):
+        clock_tick(m, i * math.tau / 12, length=0.042 if i % 3 else 0.055, width=0.007 if i % 3 else 0.011)
+    cube("minute hand", (0.0, -0.145, 0.405), (0.012, 0.01, 0.13), m["black"], (0, 0.05, 0), 0.005)
+    cube("hour hand", (0.075, -0.148, 0.275), (0.014, 0.01, 0.105), m["black"], (0, -0.9, 0), 0.005)
+    bevelled_cylinder("center pin", (0, -0.157, 0.32), 0.035, 0.018, m["black"], vertices=20, rotation=(math.pi / 2, 0, 0), bevel=0.004)
+    ico("left yellow bell", (-0.22, 0, 0.68), (0.15, 0.12, 0.085), m["yellow"], 2)
+    ico("right yellow bell", (0.22, 0, 0.68), (0.15, 0.12, 0.085), m["yellow"], 2)
+    rounded_cube("top hammer", (0, 0, 0.79), (0.045, 0.045, 0.05), m["gold"], bevel=0.012, segments=2)
+    rounded_cube("left foot", (-0.18, -0.01, -0.02), (0.055, 0.065, 0.12), m["black"], (0.45, 0, -0.35), 0.015, 2)
+    rounded_cube("right foot", (0.18, -0.01, -0.02), (0.055, 0.065, 0.12), m["black"], (0.45, 0, 0.35), 0.015, 2)
 
 
 def build_pencil(m):
-    cyl("barrel", (0, 0, 0.28), 0.12, 0.78, m["yellow"], vertices=6, rotation=(0, math.pi / 2, 0))
-    cone("tip", (0.47, 0, 0.28), 0.12, 0.02, 0.2, m["cream"], vertices=6, rotation=(0, math.pi / 2, 0))
-    cone("lead", (0.58, 0, 0.28), 0.045, 0.01, 0.08, m["black"], vertices=6, rotation=(0, math.pi / 2, 0))
-    cyl("eraser", (-0.48, 0, 0.28), 0.12, 0.16, m["pink"], vertices=12, rotation=(0, math.pi / 2, 0))
+    cyl("hex yellow barrel", (0, 0, 0.28), 0.13, 0.72, m["yellow"], vertices=6, rotation=(0, math.pi / 2, 0))
+    for y in (-0.075, 0.075):
+        cube("barrel facet highlight", (0, y, 0.382), (0.34, 0.008, 0.012), m["gold"], (0, 0, 0), 0.002)
+    cone("wooden sharpened tip", (0.46, 0, 0.28), 0.13, 0.035, 0.2, m["cream"], vertices=6, rotation=(0, math.pi / 2, 0))
+    cone("black graphite point", (0.59, 0, 0.28), 0.048, 0.01, 0.09, m["black"], vertices=6, rotation=(0, math.pi / 2, 0))
+    for x in (-0.42, -0.37):
+        bevelled_cylinder("silver ferrule band", (x, 0, 0.28), 0.132, 0.045, m["metal"], vertices=18, rotation=(0, math.pi / 2, 0), bevel=0.006)
+    bevelled_cylinder("pink eraser", (-0.5, 0, 0.28), 0.13, 0.16, m["pink"], vertices=18, rotation=(0, math.pi / 2, 0), bevel=0.012)
 
 
 def build_gift_box(m):
-    cube("box", (0, 0, 0.28), (0.38, 0.38, 0.28), m["purple"], bevel=0.05)
-    cube("ribbon x", (0, 0, 0.58), (0.42, 0.06, 0.035), m["green"], bevel=0.015)
-    cube("ribbon y", (0, 0, 0.58), (0.06, 0.42, 0.035), m["green"], bevel=0.015)
-    torus("bow left", (-0.12, 0, 0.68), 0.08, 0.025, m["green"], (0.6, 0, 0))
-    torus("bow right", (0.12, 0, 0.68), 0.08, 0.025, m["green"], (0.6, 0, 0))
+    rounded_cube("purple lower box", (0, 0, 0.25), (0.76, 0.76, 0.5), m["purple"], bevel=0.045, segments=3)
+    rounded_cube("purple lid", (0, 0, 0.54), (0.84, 0.84, 0.16), m["purple"], bevel=0.04, segments=3)
+    rounded_cube("vertical ribbon front", (0, -0.39, 0.31), (0.09, 0.025, 0.56), m["green"], bevel=0.012, segments=2)
+    rounded_cube("vertical ribbon back", (0, 0.39, 0.31), (0.09, 0.025, 0.56), m["green"], bevel=0.012, segments=2)
+    rounded_cube("vertical ribbon left", (-0.39, 0, 0.31), (0.025, 0.09, 0.56), m["green"], bevel=0.012, segments=2)
+    rounded_cube("vertical ribbon right", (0.39, 0, 0.31), (0.025, 0.09, 0.56), m["green"], bevel=0.012, segments=2)
+    rounded_cube("top ribbon x", (0, 0, 0.64), (0.88, 0.09, 0.04), m["green"], bevel=0.014, segments=2)
+    rounded_cube("top ribbon y", (0, 0, 0.642), (0.09, 0.88, 0.04), m["green"], bevel=0.014, segments=2)
+    torus("left bow loop", (-0.115, 0, 0.72), 0.08, 0.026, m["green"], (0.55, 0.4, 0), segments=24)
+    torus("right bow loop", (0.115, 0, 0.72), 0.08, 0.026, m["green"], (0.55, -0.4, 0), segments=24)
+    rounded_cube("bow knot", (0, 0, 0.705), (0.065, 0.065, 0.045), m["green"], bevel=0.014, segments=2)
 
 
 def build_rubber_duck(m):
-    ico("body", (0, 0, 0.25), (0.4, 0.28, 0.2), m["yellow"])
-    ico("head", (0.26, -0.05, 0.48), (0.18, 0.16, 0.16), m["yellow"])
-    cone("beak", (0.45, -0.05, 0.46), 0.08, 0.02, 0.18, m["orange"], rotation=(0, math.pi / 2, 0))
-    add_eye(m, 0.3, -0.18, 0.54)
+    ico("duck rounded body", (-0.05, 0, 0.25), (0.42, 0.29, 0.19), m["yellow"], 2)
+    ico("duck upright head", (0.18, -0.02, 0.52), (0.2, 0.17, 0.17), m["yellow"], 2)
+    ico("tail lift", (-0.42, 0, 0.35), (0.13, 0.18, 0.13), m["yellow"], 1)
+    ico("side wing left", (-0.08, -0.245, 0.28), (0.18, 0.045, 0.13), m["gold"], 1)
+    ico("side wing right", (-0.08, 0.245, 0.28), (0.18, 0.045, 0.13), m["gold"], 1)
+    ico("upper orange bill", (0.37, -0.02, 0.49), (0.15, 0.09, 0.045), m["orange"], 1)
+    ico("lower orange bill", (0.36, -0.02, 0.455), (0.13, 0.075, 0.032), m["orange"], 1)
+    add_eye(m, 0.26, -0.155, 0.57)
+    add_eye(m, 0.26, 0.115, 0.57)
 
 
 def build_button(m):
-    cyl("button", (0, 0, 0.12), 0.36, 0.16, m["blue"], vertices=20)
-    cyl("rim", (0, 0, 0.23), 0.29, 0.04, m["light_blue"], vertices=20)
+    bevelled_cylinder("thick blue button", (0, 0, 0.14), 0.36, 0.18, m["blue"], vertices=48, bevel=0.025)
+    bevelled_cylinder("raised outer rim", (0, 0, 0.25), 0.305, 0.04, m["light_blue"], vertices=48, bevel=0.012)
+    bevelled_cylinder("recessed inner dish", (0, 0, 0.278), 0.235, 0.018, m["blue"], vertices=48, bevel=0.008)
     for x in (-0.1, 0.1):
         for y in (-0.1, 0.1):
-            cyl("hole", (x, y, 0.31), 0.035, 0.025, m["black"], vertices=10)
+            bevelled_cylinder("dark button hole", (x, y, 0.302), 0.043, 0.026, m["black"], vertices=20, bevel=0.004)
 
 
 BUILDERS = {
@@ -380,7 +482,13 @@ def export_item(theme, slug, builder):
 
 
 def main():
-    for theme, items in BUILDERS.items():
+    parser = argparse.ArgumentParser(description="Generate catch-goose GLB item models.")
+    parser.add_argument("--theme", choices=sorted(BUILDERS), help="Generate one theme instead of every model.")
+    script_args = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
+    args = parser.parse_args(script_args)
+
+    selected = {args.theme: BUILDERS[args.theme]} if args.theme else BUILDERS
+    for theme, items in selected.items():
         for slug, builder in items:
             export_item(theme, slug, builder)
 

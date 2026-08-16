@@ -2,49 +2,50 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import catalog from '../assets/item-catalog.json';
+import bgmUrl from '../assets/bgm.mp3?url';
 import './style.css';
 
 const app = document.querySelector('#app');
 app.innerHTML = `
   <main class="game-shell">
-    <section class="topbar">
-      <h1>抓大鹅</h1>
-    </section>
     <section class="stage-wrap">
       <canvas id="gameCanvas" aria-label="抓大鹅游戏画面"></canvas>
-      <div class="left-badge">剩余 <strong id="leftCount">0</strong></div>
+      <div class="left-hud">
+        <div class="left-badge">剩余 <strong id="leftCount">0</strong></div>
+        <button id="shuffleBtn" type="button">晃一下</button>
+      </div>
+      <div class="right-hud">
+        <div class="time-badge">时间 <strong id="timeCount">0</strong>s</div>
+        <button id="restartBtn" class="restart-button" type="button">重新开始</button>
+      </div>
       <div id="message" class="message hidden"></div>
-    </section>
-    <section class="controls">
-      <button id="shuffleBtn" type="button">晃一下</button>
-      <button id="restartBtn" type="button">重新开始</button>
-      <label class="theme-picker" style="display:flex;align-items:center;gap:8px;color:#253c2b;font-weight:700;">
-        <span>模型类型</span>
-        <select id="themeSelect" aria-label="选择模型类型" style="min-height:44px;border:1px solid #aebda7;border-radius:8px;background:#fffaf0;color:#253c2b;padding:0 10px;font:inherit;"></select>
-      </label>
     </section>
   </main>
 `;
 
 const canvas = document.querySelector('#gameCanvas');
 const leftCountEl = document.querySelector('#leftCount');
+const timeCountEl = document.querySelector('#timeCount');
 const messageEl = document.querySelector('#message');
-const themeSelect = document.querySelector('#themeSelect');
 const modelFiles = import.meta.glob('../assets/models/**/*.glb', { eager: true, import: 'default', query: '?url' });
+const backgroundFiles = import.meta.glob('../assets/backgrounds/*.png', { eager: true, import: 'default', query: '?url' });
 const modelUrlByCatalogPath = Object.fromEntries(
   Object.entries(modelFiles).map(([path, url]) => [path.replace('../', ''), url])
+);
+const backgroundUrlByCatalogPath = Object.fromEntries(
+  Object.entries(backgroundFiles).map(([path, url]) => [path.replace('../', ''), url])
 );
 const gltfLoader = new GLTFLoader();
 const modelCache = new Map();
 
 const traySize = 8;
 const cone = {
-  topY: 4.4,
-  bottomY: -4.2,
-  topRadius: 4.15,
-  bottomRadius: 0.95,
+  topY: 4,
+  bottomY: -4,
+  topRadius: 3.5,
+  bottomRadius: 0.5,
   capPadding: 0.5,
-  itemRadius: 0.38
+  itemRadius: 0.3
 };
 
 const trayConfig = {
@@ -53,6 +54,7 @@ const trayConfig = {
   spacing: 0.82,
   slotSize: 0.68
 };
+const initialItemCount = 99;
 const trayQuaternion = new THREE.Quaternion();
 
 const debugItemTypes = [
@@ -83,6 +85,9 @@ let raycaster = new THREE.Raycaster();
 let lastTime = performance.now();
 let hoveredItem = null;
 let pressedItem = null;
+let bgm;
+let selectedTheme = null;
+let gameStartTime = performance.now();
 
 start();
 
@@ -99,7 +104,7 @@ function init() {
   renderer.shadowMap.enabled = true;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xe9efe7);
+  scene.background = null;
 
   camera = new THREE.OrthographicCamera(-5.4, 5.4, 5.4, -5.4, 0.1, 30);
   camera.position.set(0, 12, 0);
@@ -120,7 +125,7 @@ function init() {
 
   createInvisibleShadowReceiver();
   createTraySlots();
-  setupThemePicker();
+  setupBgm();
 
   window.addEventListener('resize', resize);
   canvas.addEventListener('pointermove', onPointerMove);
@@ -132,15 +137,35 @@ function init() {
   resize();
 }
 
-function setupThemePicker() {
-  const options = [
-    { id: 'debug', name: 'Debug 低模' },
-    ...catalog.themes.map((theme) => ({ id: theme.id, name: theme.name }))
-  ];
-  themeSelect.innerHTML = options
-    .map((option) => `<option value="${option.id}">${option.name}</option>`)
-    .join('');
-  themeSelect.value = catalog.themes[0]?.id || 'debug';
+function setupBgm() {
+  bgm = new Audio(bgmUrl);
+  bgm.loop = true;
+  bgm.preload = 'auto';
+  bgm.volume = 0.42;
+
+  const play = () => {
+    bgm.play().catch(() => {
+      window.addEventListener('pointerdown', play, { once: true });
+      window.addEventListener('keydown', play, { once: true });
+    });
+  };
+
+  play();
+}
+
+function updateStageBackground() {
+  const theme = getSelectedTheme();
+  const backgroundUrl = theme?.background ? backgroundUrlByCatalogPath[theme.background] : null;
+  canvas.parentElement.style.setProperty('--stage-background-image', backgroundUrl ? `url("${backgroundUrl}")` : 'none');
+}
+
+function getSelectedTheme() {
+  return selectedTheme || catalog.themes[0];
+}
+
+function pickRandomTheme() {
+  const themes = catalog.themes;
+  selectedTheme = themes[Math.floor(Math.random() * themes.length)] || null;
 }
 
 function createInvisibleShadowReceiver() {
@@ -236,20 +261,21 @@ function createPhysics() {
 async function restart() {
   setHighlightedItem(null);
   pressedItem = null;
+  pickRandomTheme();
+  updateStageBackground();
   bodies.forEach(({ mesh }) => scene.remove(mesh));
   bodies = [];
   tray = [];
   traySlotItems = createEmptyTraySlots();
   removed = 0;
   gameOver = false;
+  gameStartTime = performance.now();
+  updateTimer(gameStartTime);
   hideMessage();
   itemTypes = getSelectedItemTypes();
   createPhysics();
 
-  const deck = [];
-  itemTypes.forEach((type, typeIndex) => {
-    for (let i = 0; i < 6; i += 1) deck.push(typeIndex);
-  });
+  const deck = createMatchableDeck(itemTypes.length, initialItemCount);
   deck.sort(() => Math.random() - 0.5);
 
   for (const [index, typeIndex] of deck.entries()) {
@@ -263,8 +289,7 @@ async function restart() {
 }
 
 function getSelectedItemTypes() {
-  if (themeSelect.value === 'debug') return debugItemTypes;
-  const theme = catalog.themes.find((entry) => entry.id === themeSelect.value) || catalog.themes[0];
+  const theme = getSelectedTheme();
   return theme.items.map((item, index) => {
     const fallback = debugItemTypes[index % debugItemTypes.length];
     return {
@@ -276,6 +301,19 @@ function getSelectedItemTypes() {
       modelUrl: modelUrlByCatalogPath[item.model]
     };
   });
+}
+
+function createMatchableDeck(typeCount, itemCount) {
+  const copiesByType = Array.from({ length: typeCount }, () => 0);
+  const tripleCount = Math.floor(itemCount / 3);
+
+  for (let i = 0; i < tripleCount; i += 1) {
+    copiesByType[i % typeCount] += 3;
+  }
+
+  return copiesByType.flatMap((copies, typeIndex) => (
+    Array.from({ length: copies }, () => typeIndex)
+  ));
 }
 
 async function createItem(typeIndex, x, y, z) {
@@ -723,6 +761,10 @@ function updateHud() {
   leftCountEl.textContent = String(bodies.length - removed);
 }
 
+function updateTimer(now) {
+  timeCountEl.textContent = String(Math.floor((now - gameStartTime) / 1000));
+}
+
 function updateAnimation(item, now) {
   if (!item.animation) return;
   const progress = THREE.MathUtils.clamp((now - item.animation.start) / item.animation.duration, 0, 1);
@@ -833,6 +875,7 @@ function easeOutCubic(value) {
 function tick(now) {
   const delta = Math.min((now - lastTime) / 1000, 0.033);
   lastTime = now;
+  if (!gameOver) updateTimer(now);
   if (world) world.timestep = delta;
   if (world && !gameOver) world.step();
 

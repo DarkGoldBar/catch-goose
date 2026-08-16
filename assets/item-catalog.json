@@ -4,6 +4,7 @@
       "id": "farm-kitchen",
       "name": "农场厨房",
       "concept": "assets/concepts/farm-kitchen.png",
+      "background": "assets/backgrounds/farm-kitchen.png",
       "items": [
         { "id": "goose", "name": "大鹅", "model": "assets/models/farm-kitchen/goose.glb" },
         { "id": "egg", "name": "鸡蛋", "model": "assets/models/farm-kitchen/egg.glb" },
@@ -20,6 +21,7 @@
       "id": "seaside-catch",
       "name": "海边渔获",
       "concept": "assets/concepts/seaside-catch.png",
+      "background": "assets/backgrounds/seaside-catch.png",
       "items": [
         { "id": "fish", "name": "小鱼", "model": "assets/models/seaside-catch/fish.glb" },
         { "id": "crab", "name": "螃蟹", "model": "assets/models/seaside-catch/crab.glb" },
@@ -36,6 +38,7 @@
       "id": "toy-clutter",
       "name": "玩具杂物",
       "concept": "assets/concepts/toy-clutter.png",
+      "background": "assets/backgrounds/toy-clutter.png",
       "items": [
         { "id": "building-block", "name": "积木", "model": "assets/models/toy-clutter/building-block.glb" },
         { "id": "toy-car", "name": "玩具车", "model": "assets/models/toy-clutter/toy-car.glb" },

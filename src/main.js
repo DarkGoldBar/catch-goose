@@ -38,7 +38,7 @@ const backgroundUrlByCatalogPath = Object.fromEntries(
 const gltfLoader = new GLTFLoader();
 const modelCache = new Map();
 
-const traySize = 8;
+const traySize = 7;
 const cone = {
   topY: 4,
   bottomY: -4,
@@ -52,13 +52,18 @@ const trayConfig = {
   y: 0.35,
   z: 4.35,
   spacing: 0.82,
-  slotSize: 0.68
+  slotSize: 0.68,
+  minSlotScale: 0.58,
+  viewportPadding: 0.45
 };
 const initialItemCount = 99;
+const modelDisplayScale = 1.2;
 const fixedTimeStep = 1 / 60;
 const maxFrameDelta = 0.1;
 const maxPhysicsStepsPerFrame = 4;
-const trayQuaternion = new THREE.Quaternion();
+const trayQuaternion = new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(-Math.PI / 5, Math.PI / 4, -Math.PI / 12, 'XYZ')
+);
 
 const debugItemTypes = [
   { name: '鹅', color: 0xf8f2df, accent: 0xf0b33e, shape: 'goose' },
@@ -93,6 +98,11 @@ let pressedItem = null;
 let bgm;
 let selectedTheme = null;
 let gameStartTime = performance.now();
+let trayLayout = {
+  spacing: trayConfig.spacing,
+  slotScale: 1,
+  itemScale: 1
+};
 
 start();
 
@@ -427,7 +437,7 @@ async function makeMesh(type) {
     group.add(new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 16), mat));
   }
 
-  group.scale.setScalar(0.92);
+  group.scale.setScalar(0.92 * modelDisplayScale);
   group.traverse((child) => {
     if (child.isMesh) {
       child.castShadow = true;
@@ -447,7 +457,7 @@ async function makeModelMesh(type) {
 
   const clone = template.clone(true);
   clone.name = type.name;
-  clone.scale.setScalar(0.82);
+  clone.scale.setScalar(0.82 * modelDisplayScale);
   clone.traverse((child) => {
     if (child.isMesh) {
       child.castShadow = true;
@@ -646,7 +656,7 @@ function moveItemToTray(item, slotIndex) {
     fromQuaternion: item.mesh.quaternion.clone(),
     toQuaternion: trayQuaternion.clone(),
     startScale: item.mesh.scale.x,
-    endScale: item.baseScale * 0.82,
+    endScale: getTrayItemScale(item),
     start: performance.now(),
     duration: 360
   };
@@ -678,7 +688,7 @@ function moveItemToSlot(item, slotIndex, duration) {
     fromQuaternion: item.mesh.quaternion.clone(),
     toQuaternion: trayQuaternion.clone(),
     startScale: item.mesh.scale.x,
-    endScale: item.baseScale * 0.82,
+    endScale: getTrayItemScale(item),
     start: performance.now(),
     duration
   };
@@ -823,17 +833,35 @@ function randomDirection2() {
 }
 
 function getTraySlotPosition(index) {
-  const visibleWidth = camera ? camera.right - camera.left : 10.8;
-  const responsiveSpacing = Math.min(
-    trayConfig.spacing,
-    Math.max(0.5, (visibleWidth - trayConfig.slotSize - 0.45) / (traySize - 1))
-  );
-
   return new THREE.Vector3(
-    (index - (traySize - 1) / 2) * responsiveSpacing,
+    (index - (traySize - 1) / 2) * trayLayout.spacing,
     trayConfig.y,
     trayConfig.z
   );
+}
+
+function updateTrayLayout() {
+  if (!camera) return;
+  const visibleWidth = camera.right - camera.left;
+  const availableWidth = Math.max(visibleWidth - trayConfig.viewportPadding, trayConfig.slotSize);
+  const baseWidth = trayConfig.slotSize + trayConfig.spacing * (traySize - 1);
+  const slotScale = THREE.MathUtils.clamp(availableWidth / baseWidth, trayConfig.minSlotScale, 1);
+  const spacing = trayConfig.spacing * slotScale;
+
+  trayLayout = {
+    spacing,
+    slotScale,
+    itemScale: THREE.MathUtils.lerp(slotScale, 1, 0.35)
+  };
+
+  traySlots.forEach((slot, index) => {
+    slot.scale.setScalar(slotScale);
+    slot.position.copy(getTraySlotPosition(index));
+  });
+}
+
+function getTrayItemScale(item) {
+  return item.baseScale * 0.82 * trayLayout.itemScale;
 }
 
 function keepInsideCone(item) {
@@ -928,7 +956,8 @@ function resize() {
   const height = Math.max(rect.height, 1);
   renderer.setSize(width, height, false);
 
-  const view = 10.7;
+  const isNarrowViewport = width < 560;
+  const view = isNarrowViewport ? 10.2 : 10.7;
   const aspect = width / height;
   camera.left = -view * aspect * 0.5;
   camera.right = view * aspect * 0.5;
@@ -936,8 +965,6 @@ function resize() {
   camera.bottom = -view * 0.5;
   camera.updateProjectionMatrix();
 
-  traySlots.forEach((slot, index) => {
-    slot.position.copy(getTraySlotPosition(index));
-  });
+  updateTrayLayout();
   layoutTray();
 }

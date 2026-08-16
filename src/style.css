@@ -10,10 +10,11 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
 }
 
@@ -34,8 +35,8 @@ button:hover {
 }
 
 .game-shell {
-  height: 100vh;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
   width: 100vw;
 }
 
@@ -49,7 +50,7 @@ button:hover {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   position: relative;
   touch-action: none;
@@ -68,9 +69,9 @@ button:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  left: 14px;
+  left: max(14px, env(safe-area-inset-left));
   position: absolute;
-  top: 14px;
+  top: max(14px, env(safe-area-inset-top));
 }
 
 .right-hud {
@@ -79,8 +80,8 @@ button:hover {
   flex-direction: column;
   gap: 10px;
   position: absolute;
-  right: 14px;
-  top: 14px;
+  right: max(14px, env(safe-area-inset-right));
+  top: max(14px, env(safe-area-inset-top));
 }
 
 .left-badge,

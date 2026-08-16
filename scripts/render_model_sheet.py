@@ -8,17 +8,30 @@ from mathutils import Matrix, Vector
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOY_ORDER = [
-    "building-block",
-    "toy-car",
-    "rubber-ball",
-    "key",
-    "alarm-clock",
-    "pencil",
-    "gift-box",
-    "rubber-duck",
-    "button",
-]
+THEME_ORDERS = {
+    "toy-clutter": [
+        "building-block",
+        "toy-car",
+        "rubber-ball",
+        "key",
+        "alarm-clock",
+        "pencil",
+        "gift-box",
+        "rubber-duck",
+        "button",
+    ],
+    "seaside-catch": [
+        "fish",
+        "crab",
+        "shell",
+        "starfish",
+        "shrimp",
+        "octopus",
+        "seaweed",
+        "pearl-clam",
+        "message-bottle",
+    ],
+}
 
 
 def clear_scene():
@@ -87,15 +100,16 @@ def add_scene():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--theme", default="toy-clutter")
-    parser.add_argument("--output", default=str(ROOT / "assets" / "models" / "toy-clutter-review.png"))
+    parser.add_argument("--theme", default="toy-clutter", choices=sorted(THEME_ORDERS))
+    parser.add_argument("--output")
     script_args = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     args = parser.parse_args(script_args)
+    output = args.output or str(ROOT / "assets" / "models" / f"{args.theme}-review.png")
 
     clear_scene()
     add_scene()
     spacing = 1.55
-    for index, slug in enumerate(TOY_ORDER):
+    for index, slug in enumerate(THEME_ORDERS[args.theme]):
         row, col = divmod(index, 3)
         loc = ((col - 1) * spacing, (1 - row) * spacing, 0.45)
         import_item(ROOT / "assets" / "models" / args.theme / f"{slug}.glb", loc)
@@ -103,12 +117,11 @@ def main():
     bpy.context.scene.render.engine = "BLENDER_EEVEE"
     bpy.context.scene.render.resolution_x = 1200
     bpy.context.scene.render.resolution_y = 1200
-    bpy.context.scene.render.filepath = args.output
+    bpy.context.scene.render.filepath = output
     bpy.context.scene.eevee.taa_render_samples = 64
-    bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / "assets" / "models" / "toy-clutter-review.blend"))
     bpy.ops.render.render(write_still=True)
-    bpy.data.images["Render Result"].save_render(filepath=args.output)
-    print(f"rendered {args.output}")
+    bpy.data.images["Render Result"].save_render(filepath=output)
+    print(f"rendered {output}")
 
 
 if __name__ == "__main__":

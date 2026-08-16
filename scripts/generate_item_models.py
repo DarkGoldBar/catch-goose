@@ -172,6 +172,16 @@ def clock_tick(mats, angle, radius=0.235, length=0.045, width=0.01):
     return cube("clock tick", (x, -0.151, z), (width, 0.012, length), mats["red"], (0, angle, 0), 0.004)
 
 
+def fan_shell_segment(name, angle, material, radius=0.52, height=0.36, width=0.075):
+    x = math.sin(angle) * radius * 0.28
+    z = 0.18 + math.cos(angle) * height
+    return rounded_cube(name, (x, 0, z), (width, 0.12, radius), material, (0.15, angle, 0), 0.018, 1)
+
+
+def oval_spot(name, loc, scale, material):
+    return ico(name, loc, scale, material, 1)
+
+
 def make_materials():
     return {name: mat(name, color, metallic=0.25 if name in {"gold", "metal"} else 0.0) for name, color in COLORS.items()}
 
@@ -247,69 +257,103 @@ def build_milk_bottle(m):
 
 
 def build_fish(m):
-    ico("body", (0, 0, 0.28), (0.44, 0.25, 0.22), m["blue"])
-    cone("nose", (0.42, 0, 0.28), 0.16, 0.02, 0.2, m["light_blue"], rotation=(0, math.pi / 2, 0))
-    cone("tail", (-0.48, 0, 0.28), 0.22, 0.03, 0.25, m["blue"], rotation=(0, -math.pi / 2, 0))
-    cube("fin", (0.02, -0.22, 0.32), (0.16, 0.035, 0.08), m["light_blue"], (0.2, 0, 0.2))
-    add_eye(m, 0.25, -0.18, 0.39)
+    ico("round blue fish body", (0, 0, 0.32), (0.43, 0.25, 0.25), m["blue"], 2)
+    ico("light face bulge", (0.31, 0, 0.34), (0.18, 0.18, 0.17), m["light_blue"], 1)
+    cone("left tail fin", (-0.47, -0.02, 0.32), 0.18, 0.035, 0.24, m["blue"], vertices=4, rotation=(0, -math.pi / 2, math.radians(45)))
+    cone("top dorsal fin", (-0.05, 0.0, 0.58), 0.14, 0.02, 0.25, m["blue"], vertices=4, rotation=(0.15, 0, 0))
+    cone("bottom fin", (-0.05, 0.0, 0.08), 0.11, 0.02, 0.19, m["blue"], vertices=4, rotation=(math.pi, 0, 0))
+    rounded_cube("cyan side fin", (0.03, -0.22, 0.28), (0.17, 0.045, 0.11), m["light_blue"], (0.2, 0, 0.35), 0.018, 1)
+    ico("open mouth lip", (0.47, 0, 0.29), (0.065, 0.06, 0.025), m["black"], 1)
+    add_eye(m, 0.31, -0.18, 0.43)
+    oval_spot("eye shine", (0.326, -0.2, 0.46), (0.012, 0.012, 0.012), m["white"])
 
 
 def build_crab(m):
-    ico("body", (0, 0, 0.26), (0.36, 0.28, 0.18), m["red"])
+    ico("wide red crab body", (0, 0, 0.28), (0.4, 0.3, 0.19), m["red"], 2)
     for side in (-1, 1):
-        cone("claw", (0.38 * side, 0.22, 0.32), 0.13, 0.03, 0.28, m["red"], rotation=(0.3, side * 1.2, 0))
-        for i in range(3):
-            cube("leg", (side * (0.18 + i * 0.1), -0.22, 0.16), (0.13, 0.035, 0.035), m["red"], (0, 0, side * 0.3))
-    add_eye(m, -0.1, 0.18, 0.44)
-    add_eye(m, 0.1, 0.18, 0.44)
+        rounded_cube("crab upper arm", (side * 0.42, 0.1, 0.39), (0.24, 0.06, 0.07), m["red"], (0, 0, side * 0.55), 0.025, 2)
+        cone("large open claw", (side * 0.58, 0.22, 0.52), 0.14, 0.04, 0.24, m["red"], vertices=5, rotation=(0.2, side * 0.85, side * 0.65))
+        cone("small claw tine", (side * 0.58, 0.14, 0.41), 0.09, 0.025, 0.17, m["red"], vertices=5, rotation=(0.2, side * 1.0, side * -0.35))
+        for i, y in enumerate([-0.22, -0.08, 0.06]):
+            rounded_cube("segmented crab leg", (side * (0.31 + i * 0.08), y, 0.18), (0.2, 0.045, 0.055), m["red"], (0, 0, side * (0.45 + i * 0.18)), 0.018, 1)
+    cyl("left eye stalk", (-0.1, 0.18, 0.47), 0.018, 0.12, m["red"], vertices=8)
+    cyl("right eye stalk", (0.1, 0.18, 0.47), 0.018, 0.12, m["red"], vertices=8)
+    add_eye(m, -0.1, 0.18, 0.55)
+    add_eye(m, 0.1, 0.18, 0.55)
 
 
 def build_shell(m):
-    for i in range(7):
-        angle = -0.7 + i * 0.23
-        cube("rib", (math.sin(angle) * 0.16, 0.02, 0.28 + math.cos(angle) * 0.08), (0.05, 0.3, 0.18), m["cream"], (0, 0, angle), 0.02)
-    ico("shell back", (0, 0, 0.22), (0.42, 0.16, 0.16), m["pink"])
+    ico("fan shell body", (0, 0, 0.26), (0.46, 0.11, 0.24), m["cream"], 1)
+    for i in range(9):
+        angle = -0.65 + i * 0.1625
+        material = m["pink"] if i in (0, 8) else (m["cream"] if i % 2 else m["white"])
+        x = math.sin(angle) * 0.19
+        z = 0.28 + math.cos(angle) * 0.08
+        rounded_cube("flat scallop rib", (x, -0.08, z), (0.055, 0.055, 0.44), material, (0.1, angle, 0), 0.016, 1)
+    rounded_cube("small hinge foot", (0, -0.01, 0.08), (0.34, 0.12, 0.08), m["cream"], bevel=0.018, segments=1)
 
 
 def build_starfish(m):
     for i in range(5):
         angle = i * math.tau / 5
-        cube("arm", (math.cos(angle) * 0.16, math.sin(angle) * 0.16, 0.25), (0.12, 0.34, 0.08), m["orange"], (0, 0, angle), 0.07)
-    ico("center", (0, 0, 0.28), (0.18, 0.18, 0.1), m["orange"], 1)
+        rounded_cube("fat starfish arm", (math.cos(angle) * 0.18, math.sin(angle) * 0.18, 0.22), (0.18, 0.48, 0.1), m["orange"], (0, 0, angle), 0.075, 3)
+    ico("rounded star center", (0, 0, 0.27), (0.2, 0.2, 0.08), m["orange"], 1)
+    for i, (x, y) in enumerate([(0, 0), (0.18, 0.03), (-0.17, 0.06), (0.07, 0.2), (0.02, -0.21), (-0.24, -0.16), (0.25, -0.14)]):
+        oval_spot("raised yellow star dot", (x, y, 0.35), (0.04 if i else 0.05, 0.04 if i else 0.05, 0.025), m["gold"])
 
 
 def build_shrimp(m):
-    for i in range(5):
-        ico("segment", (-0.28 + i * 0.13, math.sin(i * 0.6) * 0.08, 0.28), (0.14, 0.11, 0.09), m["orange"], 1)
-    cone("tail", (-0.44, -0.1, 0.25), 0.12, 0.03, 0.18, m["red"], rotation=(0.3, -1.0, 0))
-    add_eye(m, 0.28, 0.08, 0.38)
+    colors = [m["red"], m["orange"], m["pink"], m["orange"], m["pink"], m["red"]]
+    for i in range(6):
+        angle = -0.25 + i * 0.28
+        x = 0.25 - i * 0.12
+        z = 0.34 - abs(i - 2) * 0.025
+        ico("curved shrimp segment", (x, math.sin(angle) * 0.18, z), (0.16, 0.12, 0.11), colors[i], 1)
+    cone("shrimp nose", (0.45, -0.05, 0.38), 0.08, 0.015, 0.18, m["red"], vertices=5, rotation=(0.15, math.pi / 2, 0))
+    for side in (-1, 1):
+        rounded_cube("shrimp antenna", (0.5, side * 0.1, 0.31), (0.28, 0.015, 0.015), m["red"], (0.15, 0.1, side * 0.5), 0.006, 1)
+        for i in range(3):
+            rounded_cube("thin shrimp leg", (0.13 - i * 0.09, side * 0.13, 0.16), (0.13, 0.018, 0.018), m["red"], (0, 0, side * (0.8 + i * 0.2)), 0.006, 1)
+    cone("split tail top", (-0.48, 0.05, 0.27), 0.1, 0.02, 0.18, m["red"], vertices=5, rotation=(0.2, -math.pi / 2, 0.45))
+    cone("split tail bottom", (-0.48, -0.08, 0.22), 0.1, 0.02, 0.18, m["red"], vertices=5, rotation=(-0.2, -math.pi / 2, -0.45))
+    add_eye(m, 0.35, -0.1, 0.47)
 
 
 def build_octopus(m):
-    ico("head", (0, 0, 0.45), (0.32, 0.3, 0.28), m["purple"])
-    for i in range(8):
-        angle = i * math.tau / 8
-        cube("tentacle", (math.cos(angle) * 0.28, math.sin(angle) * 0.28, 0.18), (0.08, 0.25, 0.06), m["purple"], (0, 0, angle), 0.06)
-    add_eye(m, -0.08, -0.2, 0.52)
-    add_eye(m, 0.08, -0.2, 0.52)
+    ico("large octopus head", (0, 0, 0.48), (0.33, 0.3, 0.31), m["purple"], 2)
+    for i, angle in enumerate([-1.2, -0.8, -0.4, 0.0, 0.4, 0.8, 1.2, math.pi]):
+        x = math.sin(angle) * 0.27
+        y = -0.12 - abs(math.cos(angle)) * 0.16 if angle != math.pi else 0.18
+        rounded_cube("visible octopus tentacle", (x, y, 0.18), (0.1, 0.32, 0.085), m["purple"], (0, 0, angle), 0.055, 3)
+        oval_spot("pink suction cup", (x * 1.15, y - 0.13, 0.15), (0.035, 0.035, 0.018), m["pink"])
+    add_eye(m, -0.08, -0.22, 0.52)
+    add_eye(m, 0.08, -0.22, 0.52)
+    rounded_cube("tiny octopus mouth", (0, -0.25, 0.42), (0.08, 0.012, 0.018), m["pink"], bevel=0.006, segments=1)
 
 
 def build_seaweed(m):
-    cyl("base", (0, 0, 0.05), 0.25, 0.1, m["cream"], vertices=12)
-    for i, x in enumerate([-0.22, -0.08, 0.08, 0.22]):
-        cube("blade", (x, 0, 0.36), (0.055, 0.05, 0.38), m["green"], (0.15 * i, 0.25 - i * 0.12, 0.2 * i), 0.03)
+    bevelled_cylinder("sandy seaweed base", (0, 0, 0.05), 0.27, 0.1, m["cream"], vertices=18, bevel=0.015)
+    for i, (x, height, material, lean) in enumerate([(-0.22, 0.55, m["green"], -0.35), (-0.08, 0.8, m["green"], 0.18), (0.09, 0.68, m["green"], -0.12), (0.23, 0.62, m["light_blue"], 0.32)]):
+        rounded_cube("wide waving seaweed blade", (x, 0, 0.13 + height / 2), (0.13, 0.055, height), material, (0, lean, 0.15 * i), 0.04, 3)
+        rounded_cube("curved blade tip", (x + math.sin(lean) * 0.12, 0, 0.16 + height), (0.11, 0.05, 0.16), material, (0, lean + 0.45, 0.15 * i), 0.035, 2)
+        oval_spot("blade highlight", (x + 0.025, -0.03, 0.25 + height * 0.45), (0.018, 0.01, height * 0.22), m["gold"] if i < 2 else m["green"])
 
 
 def build_pearl_clam(m):
-    ico("bottom shell", (0, 0, 0.16), (0.44, 0.26, 0.1), m["pink"])
-    ico("top shell", (0, 0.1, 0.44), (0.44, 0.16, 0.1), m["cream"])
-    ico("pearl", (0, -0.04, 0.34), (0.16, 0.16, 0.16), m["white"])
+    ico("lower pink clam", (0, -0.03, 0.16), (0.42, 0.25, 0.09), m["pink"], 1)
+    ico("upper open clam", (0, 0.08, 0.43), (0.44, 0.18, 0.1), m["cream"], 1)
+    for i in range(7):
+        x = -0.27 + i * 0.09
+        oval_spot("clam rim tooth", (x, 0.02, 0.32 + abs(i - 3) * 0.015), (0.05, 0.035, 0.025), m["cream"])
+    ico("large white pearl", (0, -0.08, 0.32), (0.16, 0.16, 0.16), m["white"], 2)
 
 
 def build_message_bottle(m):
-    cyl("bottle", (0, 0, 0.28), 0.18, 0.72, m["glass"], vertices=12, rotation=(0, math.pi / 2, 0))
-    cyl("cork", (0.42, 0, 0.28), 0.11, 0.18, m["brown"], vertices=10, rotation=(0, math.pi / 2, 0))
-    cube("scroll", (-0.02, 0, 0.29), (0.23, 0.04, 0.08), m["cream"], (0, 0, 0.15), 0.01)
+    bevelled_cylinder("transparent teal bottle body", (0, 0, 0.28), 0.18, 0.62, m["glass"], vertices=12, rotation=(0, math.pi / 2, 0), bevel=0.018)
+    bevelled_cylinder("narrow bottle neck", (0.36, 0, 0.28), 0.105, 0.18, m["glass"], vertices=12, rotation=(0, math.pi / 2, 0), bevel=0.012)
+    bevelled_cylinder("bottle lip ring", (0.27, 0, 0.28), 0.125, 0.055, m["light_blue"], vertices=12, rotation=(0, math.pi / 2, 0), bevel=0.008)
+    bevelled_cylinder("cork stopper", (0.48, 0, 0.28), 0.11, 0.16, m["brown"], vertices=10, rotation=(0, math.pi / 2, 0), bevel=0.01)
+    bevelled_cylinder("rolled message", (-0.06, 0, 0.28), 0.075, 0.36, m["cream"], vertices=12, rotation=(0, math.pi / 2, 0), bevel=0.01)
 
 
 def build_building_block(m):

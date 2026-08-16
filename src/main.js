@@ -55,6 +55,9 @@ const trayConfig = {
   slotSize: 0.68
 };
 const initialItemCount = 99;
+const fixedTimeStep = 1 / 60;
+const maxFrameDelta = 0.1;
+const maxPhysicsStepsPerFrame = 4;
 const trayQuaternion = new THREE.Quaternion();
 
 const debugItemTypes = [
@@ -83,6 +86,8 @@ let gameOver = false;
 let pointer = new THREE.Vector2();
 let raycaster = new THREE.Raycaster();
 let lastTime = performance.now();
+let physicsAccumulator = 0;
+let animationFrameId = null;
 let hoveredItem = null;
 let pressedItem = null;
 let bgm;
@@ -95,7 +100,14 @@ async function start() {
   await RAPIER.init();
   init();
   await restart();
-  requestAnimationFrame(tick);
+  startRenderLoop();
+}
+
+function startRenderLoop() {
+  if (animationFrameId != null) cancelAnimationFrame(animationFrameId);
+  lastTime = performance.now();
+  physicsAccumulator = 0;
+  animationFrameId = requestAnimationFrame(tick);
 }
 
 function init() {
@@ -873,11 +885,25 @@ function easeOutCubic(value) {
 }
 
 function tick(now) {
-  const delta = Math.min((now - lastTime) / 1000, 0.033);
+  const delta = Math.min((now - lastTime) / 1000, maxFrameDelta);
   lastTime = now;
   if (!gameOver) updateTimer(now);
-  if (world) world.timestep = delta;
-  if (world && !gameOver) world.step();
+
+  if (world && !gameOver) {
+    physicsAccumulator += delta;
+    let steps = 0;
+    world.timestep = fixedTimeStep;
+
+    while (physicsAccumulator >= fixedTimeStep && steps < maxPhysicsStepsPerFrame) {
+      world.step();
+      physicsAccumulator -= fixedTimeStep;
+      steps += 1;
+    }
+
+    if (steps === maxPhysicsStepsPerFrame) {
+      physicsAccumulator = 0;
+    }
+  }
 
   bodies.forEach((item) => {
     if (item.status === 'gone') return;
@@ -893,7 +919,7 @@ function tick(now) {
   });
 
   renderer.render(scene, camera);
-  requestAnimationFrame(tick);
+  animationFrameId = requestAnimationFrame(tick);
 }
 
 function resize() {
@@ -915,4 +941,3 @@ function resize() {
   });
   layoutTray();
 }
-

@@ -40,9 +40,9 @@ const modelCache = new Map();
 
 const traySize = 7;
 const cone = {
-  topY: 4,
+  topY: 6,
   bottomY: -4,
-  topRadius: 3.5,
+  topRadius: 4,
   bottomRadius: 0.5,
   capPadding: 0.5,
   itemRadius: 0.3
@@ -58,6 +58,9 @@ const trayConfig = {
 };
 const initialItemCount = 99;
 const modelDisplayScale = 1.2;
+const colliderPadding = 0.08;
+const ellipsoidLatitudeSegments = 6;
+const ellipsoidLongitudeSegments = 12;
 const fixedTimeStep = 1 / 60;
 const maxFrameDelta = 0.1;
 const maxPhysicsStepsPerFrame = 4;
@@ -354,13 +357,7 @@ async function createItem(typeIndex, x, y, z) {
       .setLinearDamping(0.42)
       .setAngularDamping(0.45)
   );
-  world.createCollider(
-    RAPIER.ColliderDesc
-      .ball(cone.itemRadius)
-      .setRestitution(0.08)
-      .setFriction(0.95),
-    body
-  );
+  world.createCollider(createItemColliderDesc(mesh), body);
 
   const item = {
     mesh,
@@ -464,7 +461,19 @@ async function makeModelMesh(type) {
       child.receiveShadow = true;
     }
   });
+  clone.userData.ellipsoidCollider = buildEllipsoidColliderData(clone);
   return clone;
+}
+
+function createItemColliderDesc(mesh) {
+  const ellipsoid = mesh.userData.ellipsoidCollider;
+  const desc = ellipsoid
+    ? RAPIER.ColliderDesc.convexHull(ellipsoid.points) ?? RAPIER.ColliderDesc.ball(cone.itemRadius)
+    : RAPIER.ColliderDesc.ball(cone.itemRadius);
+
+  return desc
+    .setRestitution(0.08)
+    .setFriction(0.95);
 }
 
 function normalizeModelTemplate(model) {
@@ -483,6 +492,45 @@ function normalizeModelTemplate(model) {
   root.scale.setScalar(0.9 / largest);
   root.updateMatrixWorld(true);
   return root;
+}
+
+function buildEllipsoidColliderData(root) {
+  const bounds = getVertexBoundsInRootSpace(root);
+  if (bounds.isEmpty()) return null;
+
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  bounds.getSize(size);
+  bounds.getCenter(center);
+
+  const scale = root.scale;
+  const radii = new THREE.Vector3(
+    Math.max(size.x * Math.abs(scale.x) * 0.5 + colliderPadding, cone.itemRadius * 0.45),
+    Math.max(size.y * Math.abs(scale.y) * 0.5 + colliderPadding, cone.itemRadius * 0.45),
+    Math.max(size.z * Math.abs(scale.z) * 0.5 + colliderPadding, cone.itemRadius * 0.45)
+  );
+  const scaledCenter = center.multiply(scale);
+
+  const points = [];
+  points.push(scaledCenter.x, scaledCenter.y + radii.y, scaledCenter.z);
+  points.push(scaledCenter.x, scaledCenter.y - radii.y, scaledCenter.z);
+
+  for (let lat = 1; lat < ellipsoidLatitudeSegments; lat += 1) {
+    const phi = (lat / ellipsoidLatitudeSegments) * Math.PI;
+    const y = Math.cos(phi) * radii.y;
+    const ring = Math.sin(phi);
+
+    for (let lon = 0; lon < ellipsoidLongitudeSegments; lon += 1) {
+      const theta = (lon / ellipsoidLongitudeSegments) * Math.PI * 2;
+      points.push(
+        scaledCenter.x + Math.cos(theta) * ring * radii.x,
+        scaledCenter.y + y,
+        scaledCenter.z + Math.sin(theta) * ring * radii.z
+      );
+    }
+  }
+
+  return { points: new Float32Array(points) };
 }
 
 function getVertexBoundsInRootSpace(model) {

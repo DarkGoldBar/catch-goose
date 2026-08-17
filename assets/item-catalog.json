@@ -50,6 +50,23 @@
         { "id": "rubber-duck", "name": "鸭子玩具", "model": "assets/models/toy-clutter/rubber-duck.glb" },
         { "id": "button", "name": "按钮", "model": "assets/models/toy-clutter/button.glb" }
       ]
+    },
+    {
+      "id": "fruit-basket",
+      "name": "水果篮子",
+      "concept": "assets/concepts/fruit-basket.png",
+      "background": "assets/backgrounds/fruit-basket.png",
+      "items": [
+        { "id": "whole-watermelon", "name": "整个西瓜", "model": "assets/models/lowpoly-fruit/whole-watermelon.glb" },
+        { "id": "watermelon-wedge", "name": "一牙西瓜", "model": "assets/models/lowpoly-fruit/watermelon-wedge.glb" },
+        { "id": "durian", "name": "整个榴莲", "model": "assets/models/lowpoly-fruit/durian.glb" },
+        { "id": "half-pomegranate", "name": "半个石榴", "model": "assets/models/lowpoly-fruit/half-pomegranate.glb" },
+        { "id": "orange", "name": "橙子", "model": "assets/models/lowpoly-fruit/orange.glb" },
+        { "id": "apple", "name": "苹果", "model": "assets/models/lowpoly-fruit/apple.glb" },
+        { "id": "pineapple", "name": "菠萝", "model": "assets/models/lowpoly-fruit/pineapple.glb" },
+        { "id": "banana-bunch", "name": "香蕉", "model": "assets/models/lowpoly-fruit/banana-bunch.glb" },
+        { "id": "grape-cluster", "name": "一串葡萄", "model": "assets/models/lowpoly-fruit/grape-cluster.glb" }
+      ]
     }
   ],
   "debugFallback": {

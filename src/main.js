@@ -323,9 +323,15 @@ function getSelectedItemTypes() {
       color: fallback.color,
       accent: fallback.accent,
       shape: fallback.shape,
-      modelUrl: modelUrlByCatalogPath[item.model]
+      modelUrl: modelUrlByCatalogPath[item.model],
+      modelScale: getCatalogModelScale(item)
     };
   });
+}
+
+function getCatalogModelScale(item) {
+  const scale = Number(item.scale);
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
 }
 
 function createMatchableDeck(typeCount, itemCount) {
@@ -438,7 +444,7 @@ async function makeMesh(type) {
   group.traverse((child) => {
     if (child.isMesh) {
       child.castShadow = true;
-      child.receiveShadow = true;
+      child.receiveShadow = false;
     }
   });
   return group;
@@ -454,11 +460,11 @@ async function makeModelMesh(type) {
 
   const clone = template.clone(true);
   clone.name = type.name;
-  clone.scale.setScalar(0.82 * modelDisplayScale);
+  clone.scale.setScalar(0.82 * modelDisplayScale * type.modelScale);
   clone.traverse((child) => {
     if (child.isMesh) {
       child.castShadow = true;
-      child.receiveShadow = true;
+      child.receiveShadow = false;
     }
   });
   clone.userData.ellipsoidCollider = buildEllipsoidColliderData(clone);

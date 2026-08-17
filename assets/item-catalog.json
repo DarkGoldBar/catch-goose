@@ -57,12 +57,12 @@
       "concept": "assets/concepts/fruit-basket.png",
       "background": "assets/backgrounds/fruit-basket.png",
       "items": [
-        { "id": "whole-watermelon", "name": "整个西瓜", "model": "assets/models/lowpoly-fruit/whole-watermelon.glb" },
-        { "id": "watermelon-wedge", "name": "一牙西瓜", "model": "assets/models/lowpoly-fruit/watermelon-wedge.glb" },
-        { "id": "durian", "name": "整个榴莲", "model": "assets/models/lowpoly-fruit/durian.glb" },
-        { "id": "half-pomegranate", "name": "半个石榴", "model": "assets/models/lowpoly-fruit/half-pomegranate.glb" },
-        { "id": "orange", "name": "橙子", "model": "assets/models/lowpoly-fruit/orange.glb" },
-        { "id": "apple", "name": "苹果", "model": "assets/models/lowpoly-fruit/apple.glb" },
+        { "id": "whole-watermelon", "name": "整个西瓜", "model": "assets/models/lowpoly-fruit/whole-watermelon.glb", "scale": 1.12 },
+        { "id": "watermelon-wedge", "name": "一牙西瓜", "model": "assets/models/lowpoly-fruit/watermelon-wedge.glb", "scale": 0.78 },
+        { "id": "durian", "name": "整个榴莲", "model": "assets/models/lowpoly-fruit/durian.glb", "scale": 1.12 },
+        { "id": "half-pomegranate", "name": "半个石榴", "model": "assets/models/lowpoly-fruit/half-pomegranate.glb", "scale": 0.78 },
+        { "id": "orange", "name": "橙子", "model": "assets/models/lowpoly-fruit/orange.glb", "scale": 0.78 },
+        { "id": "apple", "name": "苹果", "model": "assets/models/lowpoly-fruit/apple.glb", "scale": 0.78 },
         { "id": "pineapple", "name": "菠萝", "model": "assets/models/lowpoly-fruit/pineapple.glb" },
         { "id": "banana-bunch", "name": "香蕉", "model": "assets/models/lowpoly-fruit/banana-bunch.glb" },
         { "id": "grape-cluster", "name": "一串葡萄", "model": "assets/models/lowpoly-fruit/grape-cluster.glb" }

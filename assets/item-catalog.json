@@ -8,7 +8,7 @@
       "items": [
         { "id": "goose", "name": "大鹅", "model": "assets/models/farm-kitchen/goose.glb" },
         { "id": "egg", "name": "鸡蛋", "model": "assets/models/farm-kitchen/egg.glb" },
-        { "id": "apple", "name": "苹果", "model": "assets/models/farm-kitchen/apple.glb" },
+        { "id": "apple", "name": "苹果", "model": "assets/models/farm-kitchen/apple.glb" , "scale": 0.4 },
         { "id": "carrot", "name": "胡萝卜", "model": "assets/models/farm-kitchen/carrot.glb" },
         { "id": "corn", "name": "玉米", "model": "assets/models/farm-kitchen/corn.glb" },
         { "id": "pumpkin", "name": "南瓜", "model": "assets/models/farm-kitchen/pumpkin.glb" },
@@ -57,19 +57,16 @@
       "concept": "assets/concepts/fruit-basket.png",
       "background": "assets/backgrounds/fruit-basket.png",
       "items": [
-        { "id": "whole-watermelon", "name": "整个西瓜", "model": "assets/models/lowpoly-fruit/whole-watermelon.glb", "scale": 1.12 },
-        { "id": "watermelon-wedge", "name": "一牙西瓜", "model": "assets/models/lowpoly-fruit/watermelon-wedge.glb", "scale": 0.78 },
-        { "id": "durian", "name": "整个榴莲", "model": "assets/models/lowpoly-fruit/durian.glb", "scale": 1.12 },
-        { "id": "half-pomegranate", "name": "半个石榴", "model": "assets/models/lowpoly-fruit/half-pomegranate.glb", "scale": 0.78 },
-        { "id": "orange", "name": "橙子", "model": "assets/models/lowpoly-fruit/orange.glb", "scale": 0.78 },
-        { "id": "apple", "name": "苹果", "model": "assets/models/lowpoly-fruit/apple.glb", "scale": 0.78 },
-        { "id": "pineapple", "name": "菠萝", "model": "assets/models/lowpoly-fruit/pineapple.glb" },
+        { "id": "whole-watermelon", "name": "整个西瓜", "model": "assets/models/lowpoly-fruit/whole-watermelon.glb", "scale": 1.1 },
+        { "id": "watermelon-wedge", "name": "一牙西瓜", "model": "assets/models/lowpoly-fruit/watermelon-wedge.glb", "scale": 0.9 },
+        { "id": "durian", "name": "整个榴莲", "model": "assets/models/lowpoly-fruit/durian.glb", "scale": 1.1 },
+        { "id": "half-pomegranate", "name": "半个石榴", "model": "assets/models/lowpoly-fruit/half-pomegranate.glb", "scale": 0.8 },
+        { "id": "orange", "name": "橙子", "model": "assets/models/lowpoly-fruit/orange.glb", "scale": 0.7 },
+        { "id": "apple", "name": "苹果", "model": "assets/models/lowpoly-fruit/apple.glb", "scale": 0.7 },
+        { "id": "pineapple", "name": "菠萝", "model": "assets/models/lowpoly-fruit/pineapple.glb", "scale": 1.1 },
         { "id": "banana-bunch", "name": "香蕉", "model": "assets/models/lowpoly-fruit/banana-bunch.glb" },
         { "id": "grape-cluster", "name": "一串葡萄", "model": "assets/models/lowpoly-fruit/grape-cluster.glb" }
       ]
     }
-  ],
-  "debugFallback": {
-    "note": "基础 low-poly 几何体仅用于 debug 或缺省回退；正式主题物品优先使用本清单里的 glb 模型。"
-  }
+  ]
 }

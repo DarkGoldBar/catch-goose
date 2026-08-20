@@ -27,6 +27,10 @@ export function getDefaultTheme() {
   return catalog.themes[0];
 }
 
+export function getThemeById(id) {
+  return catalog.themes.find((theme) => theme.id === id) || null;
+}
+
 export function getThemeBackgroundUrl(theme) {
   return theme?.background ? backgroundUrlByCatalogPath[theme.background] : null;
 }

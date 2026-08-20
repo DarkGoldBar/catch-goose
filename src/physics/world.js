@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { cone } from '../game/config.js';
+import { cone } from '../config.js';
 
 export function createPhysicsWorld(RAPIER) {
   const world = new RAPIER.World({ x: 0, y: -9.8, z: 0 });

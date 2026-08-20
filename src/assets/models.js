@@ -1,31 +1,47 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import celebrationGooseUrl from '../../assets/models/goose.glb?url';
 import {
   colliderPadding,
   cone,
   ellipsoidLatitudeSegments,
   ellipsoidLongitudeSegments,
-  modelDisplayScale
-} from '../game/config.js';
+  modelMaterialEmissiveIntensity,
+  modelMaterialLightness,
+  modelScale
+} from '../config.js';
 
 const gltfLoader = new GLTFLoader();
 const modelCache = new Map();
+const materialTextureKeys = [
+  'map',
+  'emissiveMap',
+  'aoMap',
+  'normalMap',
+  'roughnessMap',
+  'metalnessMap',
+  'alphaMap',
+  'bumpMap',
+  'displacementMap',
+  'lightMap'
+];
 
 export async function createItemMesh(type) {
   if (!type.modelUrl) {
     throw new Error(`Missing model for ${type.name}.`);
   }
 
-  let template = modelCache.get(type.modelUrl);
+  const templateCacheKey = `${type.modelUrl}:${type.modelScale}`;
+  let template = modelCache.get(templateCacheKey);
   if (!template) {
     const gltf = await gltfLoader.loadAsync(type.modelUrl);
-    template = normalizeModelTemplate(gltf.scene);
-    modelCache.set(type.modelUrl, template);
+    template = normalizeModelTemplate(gltf.scene, type.modelScale);
+    brightenModelMaterials(template);
+    modelCache.set(templateCacheKey, template);
   }
 
   const clone = template.clone(true);
   clone.name = type.name;
-  clone.scale.setScalar(0.82 * modelDisplayScale * type.modelScale);
   clone.traverse((child) => {
     if (child.isMesh) {
       child.castShadow = true;
@@ -36,7 +52,63 @@ export async function createItemMesh(type) {
   return clone;
 }
 
-function normalizeModelTemplate(model) {
+export async function createCelebrationGooseMesh() {
+  const templateCacheKey = `${celebrationGooseUrl}:celebration`;
+  let template = modelCache.get(templateCacheKey);
+  if (!template) {
+    const gltf = await gltfLoader.loadAsync(celebrationGooseUrl);
+    template = normalizeModelTemplate(gltf.scene, 1);
+    brightenModelMaterials(template);
+    modelCache.set(templateCacheKey, template);
+  }
+
+  const clone = template.clone(true);
+  clone.name = 'celebration-goose';
+  clone.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = false;
+    }
+  });
+  return clone;
+}
+
+function brightenModelMaterials(model) {
+  const updatedMaterials = new Set();
+  model.traverse((child) => {
+    if (!child.isMesh) return;
+    updateMaterialBrightness(child.material, updatedMaterials);
+  });
+}
+
+function updateMaterialBrightness(material, updatedMaterials) {
+  if (Array.isArray(material)) {
+    material.forEach((entry) => updateMaterialBrightness(entry, updatedMaterials));
+    return;
+  }
+  if (!material || material.isMeshBasicMaterial) return;
+  if (!hasMaterialTexture(material)) return;
+  if (updatedMaterials.has(material)) return;
+  updatedMaterials.add(material);
+
+  if (material.color) {
+    material.color.multiplyScalar(modelMaterialLightness);
+  }
+  if (material.emissive && material.color) {
+    material.emissive.copy(material.color);
+    material.emissiveIntensity = modelMaterialEmissiveIntensity;
+  }
+  if (material.map && 'emissiveMap' in material) {
+    material.emissiveMap = material.map;
+  }
+  material.needsUpdate = true;
+}
+
+function hasMaterialTexture(material) {
+  return materialTextureKeys.some((key) => material[key]?.isTexture);
+}
+
+function normalizeModelTemplate(model, itemModelScale) {
   model.updateMatrixWorld(true);
   const box = getVertexBoundsInRootSpace(model);
   const size = new THREE.Vector3();
@@ -49,7 +121,7 @@ function normalizeModelTemplate(model) {
   root.name = model.name || 'centered-model';
   model.position.sub(center);
   root.add(model);
-  root.scale.setScalar(0.9 / largest);
+  root.scale.setScalar((modelScale * itemModelScale) / largest);
   root.updateMatrixWorld(true);
   return root;
 }

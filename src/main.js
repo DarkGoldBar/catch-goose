@@ -3,12 +3,13 @@ import bgmUrl from '../assets/bgm.mp3?url';
 import {
   getDefaultTheme,
   getRandomTheme,
+  getThemeById,
   getThemeBackgroundUrl,
   getThemeItemTypes
 } from './assets/catalog.js';
-import { createItemMesh } from './assets/models.js';
+import { createCelebrationGooseMesh, createItemMesh } from './assets/models.js';
 import { createPhysicsWorld, keepItemInsideCone } from './physics/world.js';
-import { createGameDom } from './ui/dom.js';
+import { createGameDom } from './dom.js';
 import {
   cone,
   fixedTimeStep,
@@ -18,7 +19,7 @@ import {
   trayConfig,
   trayEulerArgs,
   traySize
-} from './game/config.js';
+} from './config.js';
 import { easeOutCubic, randomPointInCircle } from './utils/math.js';
 import './style.css';
 
@@ -63,13 +64,22 @@ let trayLayout = {
   slotScale: 1,
   itemScale: 1
 };
+let celebrationActive = false;
+let celebrationGroup;
+let celebrationGooseTemplate = null;
+let celebrationGooseLoading = null;
+let celebrationGeese = [];
+let confettiPieces = [];
+let confettiMaterials = [];
+let confettiGeometries = [];
 
 start();
 
 async function start() {
   // loaded lazily so the large wasm bundle becomes its own chunk
-  RAPIER = (await import('@dimforge/rapier3d')).default;
-  await RAPIER.init();
+  const rapierModule = await import('@dimforge/rapier3d-compat');
+  RAPIER = rapierModule.default ?? rapierModule;
+  if (typeof RAPIER.init === 'function') await RAPIER.init();
   init();
   await restart();
   startRenderLoop();
@@ -88,7 +98,7 @@ function init() {
   renderer.shadowMap.enabled = true;
 
   scene = new THREE.Scene();
-  scene.background = null;1
+  scene.background = null;
 
   camera = new THREE.OrthographicCamera(-5.4, 5.4, 5.4, -5.4, 0.1, 30);
   camera.position.set(0, 12, 0);
@@ -108,6 +118,7 @@ function init() {
   scene.add(sun);
 
   createInvisibleShadowReceiver();
+  createCelebrationLayer();
   createTraySlots();
   setupBgm();
 
@@ -147,7 +158,8 @@ function getSelectedTheme() {
 }
 
 function pickRandomTheme() {
-  selectedTheme = getRandomTheme();
+  const requestedThemeId = new URLSearchParams(window.location.search).get('theme');
+  selectedTheme = getThemeById(requestedThemeId) || getRandomTheme();
 }
 
 function createInvisibleShadowReceiver() {
@@ -197,6 +209,7 @@ function createTraySlots() {
 async function restart() {
   setHighlightedItem(null);
   pressedItem = null;
+  stopCelebration();
   pickRandomTheme();
   updateStageBackground();
   bodies.forEach(({ mesh }) => scene.remove(mesh));
@@ -526,6 +539,7 @@ function checkEndState() {
   if (removed === bodies.length && visibleTrayCount === 0 && !animatingMatches) {
     gameOver = true;
     showMessage('通关了');
+    startVictoryCelebration();
   } else if (visibleTrayCount >= traySize && !animatingMatches) {
     gameOver = true;
     showMessage('暂存栏满了');
@@ -639,6 +653,248 @@ function hideMessage() {
   messageEl.classList.add('hidden');
 }
 
+function createCelebrationLayer() {
+  celebrationGroup = new THREE.Group();
+  celebrationGroup.name = 'victory-celebration';
+  scene.add(celebrationGroup);
+
+  confettiGeometries = [
+    new THREE.PlaneGeometry(0.075, 0.18),
+    new THREE.PlaneGeometry(0.12, 0.12),
+    new THREE.CircleGeometry(0.055, 5)
+  ];
+  confettiMaterials = [
+    0xff3b6b,
+    0xffc533,
+    0x28d7ff,
+    0x7bff73,
+    0xb56cff,
+    0xffffff
+  ].map((color) => new THREE.MeshBasicMaterial({
+    color,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false
+  }));
+}
+
+function startVictoryCelebration() {
+  celebrationActive = true;
+  prepareCelebrationGoose();
+  spawnConfettiBurst(180);
+}
+
+function stopCelebration() {
+  celebrationActive = false;
+
+  celebrationGeese.forEach((goose) => {
+    celebrationGroup.remove(goose.mesh);
+  });
+  celebrationGeese = [];
+
+  confettiPieces.forEach((piece) => {
+    celebrationGroup.remove(piece.mesh);
+    piece.mesh.material.dispose();
+  });
+  confettiPieces = [];
+}
+
+function prepareCelebrationGoose() {
+  if (celebrationGooseTemplate || celebrationGooseLoading) return;
+  celebrationGooseLoading = createCelebrationGooseMesh()
+    .then((mesh) => {
+      celebrationGooseTemplate = mesh;
+      celebrationGooseLoading = null;
+      if (celebrationActive) spawnCelebrationGoose(performance.now());
+    })
+    .catch(() => {
+      celebrationGooseLoading = null;
+    });
+}
+
+function updateCelebration(now, delta) {
+  if (!celebrationActive) return;
+
+  if (celebrationGooseTemplate && Math.random() < 1 / 30) {
+    spawnCelebrationGoose(now);
+  }
+
+  if (confettiPieces.length < 360) {
+    spawnConfettiRain(now, 4);
+  }
+
+  updateCelebrationGeese(now, delta);
+  updateConfetti(now, delta);
+}
+
+function spawnCelebrationGoose(now) {
+  if (!celebrationGooseTemplate || celebrationGeese.length >= 28) return;
+
+  const bounds = getCameraWorldBounds(1.1);
+  const edge = Math.floor(Math.random() * 4);
+  const start = new THREE.Vector3();
+  const end = new THREE.Vector3();
+  const sideOffset = THREE.MathUtils.randFloat(-0.8, 0.8);
+
+  if (edge === 0) {
+    start.set(bounds.left, THREE.MathUtils.randFloat(4.4, 7.2), THREE.MathUtils.randFloat(bounds.bottom, bounds.top));
+    end.set(bounds.right, start.y + sideOffset, THREE.MathUtils.randFloat(bounds.bottom, bounds.top));
+  } else if (edge === 1) {
+    start.set(bounds.right, THREE.MathUtils.randFloat(4.4, 7.2), THREE.MathUtils.randFloat(bounds.bottom, bounds.top));
+    end.set(bounds.left, start.y + sideOffset, THREE.MathUtils.randFloat(bounds.bottom, bounds.top));
+  } else if (edge === 2) {
+    start.set(THREE.MathUtils.randFloat(bounds.left, bounds.right), THREE.MathUtils.randFloat(4.4, 7.2), bounds.top);
+    end.set(THREE.MathUtils.randFloat(bounds.left, bounds.right), start.y + sideOffset, bounds.bottom);
+  } else {
+    start.set(THREE.MathUtils.randFloat(bounds.left, bounds.right), THREE.MathUtils.randFloat(4.4, 7.2), bounds.bottom);
+    end.set(THREE.MathUtils.randFloat(bounds.left, bounds.right), start.y + sideOffset, bounds.top);
+  }
+
+  const mesh = celebrationGooseTemplate.clone(true);
+  const travel = end.clone().sub(start);
+  const flightYaw = Math.atan2(travel.x, travel.z);
+  mesh.position.copy(start);
+  mesh.rotation.set(
+    THREE.MathUtils.randFloat(-0.75, 0.75),
+    flightYaw + THREE.MathUtils.randFloat(-0.65, 0.65),
+    THREE.MathUtils.randFloat(0, Math.PI * 2)
+  );
+  mesh.scale.setScalar(THREE.MathUtils.randFloat(0.92, 1.45));
+  celebrationGroup.add(mesh);
+
+  celebrationGeese.push({
+    mesh,
+    start,
+    end,
+    startTime: now,
+    duration: THREE.MathUtils.randFloat(1500, 2800),
+    wobble: THREE.MathUtils.randFloat(0.08, 0.32),
+    phase: Math.random() * Math.PI * 2,
+    angularVelocity: new THREE.Vector3(
+      THREE.MathUtils.randFloat(-2.8, 2.8),
+      THREE.MathUtils.randFloat(-3.6, 3.6),
+      THREE.MathUtils.randFloat(-5.6, 5.6)
+    )
+  });
+}
+
+function updateCelebrationGeese(now, delta) {
+  for (let index = celebrationGeese.length - 1; index >= 0; index -= 1) {
+    const goose = celebrationGeese[index];
+    const progress = (now - goose.startTime) / goose.duration;
+    if (progress >= 1) {
+      celebrationGroup.remove(goose.mesh);
+      celebrationGeese.splice(index, 1);
+      continue;
+    }
+
+    goose.mesh.position.lerpVectors(goose.start, goose.end, easeOutCubic(progress));
+    goose.mesh.position.y += Math.sin(progress * Math.PI * 6 + goose.phase) * goose.wobble;
+    goose.mesh.rotation.x += goose.angularVelocity.x * delta;
+    goose.mesh.rotation.y += goose.angularVelocity.y * delta;
+    goose.mesh.rotation.z += goose.angularVelocity.z * delta;
+  }
+}
+
+function spawnConfettiBurst(count) {
+  for (let i = 0; i < count; i += 1) {
+    spawnConfettiPiece(performance.now(), true);
+  }
+}
+
+function spawnConfettiRain(now, count) {
+  for (let i = 0; i < count; i += 1) {
+    spawnConfettiPiece(now, false);
+  }
+}
+
+function spawnConfettiPiece(now, burst) {
+  const bounds = getCameraWorldBounds(0.25);
+  const geometry = confettiGeometries[Math.floor(Math.random() * confettiGeometries.length)];
+  const material = confettiMaterials[Math.floor(Math.random() * confettiMaterials.length)].clone();
+  const mesh = new THREE.Mesh(geometry, material);
+  const originX = burst ? THREE.MathUtils.randFloat(-1.8, 1.8) : THREE.MathUtils.randFloat(bounds.left, bounds.right);
+  const originZ = burst ? THREE.MathUtils.randFloat(-1.3, 1.3) : bounds.top;
+
+  mesh.position.set(
+    originX,
+    THREE.MathUtils.randFloat(6.5, 9.8),
+    originZ
+  );
+  mesh.rotation.set(
+    Math.random() * Math.PI,
+    Math.random() * Math.PI,
+    Math.random() * Math.PI
+  );
+  mesh.scale.setScalar(THREE.MathUtils.randFloat(0.8, 1.65));
+  celebrationGroup.add(mesh);
+
+  const burstDirection = randomDirection2();
+  confettiPieces.push({
+    mesh,
+    startTime: now,
+    life: THREE.MathUtils.randFloat(2500, 4300),
+    velocity: new THREE.Vector3(
+      burst
+        ? burstDirection.x * THREE.MathUtils.randFloat(1.4, 4.8)
+        : THREE.MathUtils.randFloat(-0.65, 0.65),
+      burst ? THREE.MathUtils.randFloat(0.4, 2.2) : THREE.MathUtils.randFloat(-0.1, 0.4),
+      burst
+        ? burstDirection.y * THREE.MathUtils.randFloat(1.4, 4.8)
+        : THREE.MathUtils.randFloat(-2.4, -0.9)
+    ),
+    spin: new THREE.Vector3(
+      THREE.MathUtils.randFloat(-9, 9),
+      THREE.MathUtils.randFloat(-12, 12),
+      THREE.MathUtils.randFloat(-10, 10)
+    ),
+    sway: THREE.MathUtils.randFloat(0.45, 1.4),
+    phase: Math.random() * Math.PI * 2
+  });
+}
+
+function updateConfetti(now, delta) {
+  const bounds = getCameraWorldBounds(0.8);
+
+  for (let index = confettiPieces.length - 1; index >= 0; index -= 1) {
+    const piece = confettiPieces[index];
+    const age = now - piece.startTime;
+    const progress = age / piece.life;
+
+    if (
+      progress >= 1 ||
+      piece.mesh.position.x < bounds.left ||
+      piece.mesh.position.x > bounds.right ||
+      piece.mesh.position.z < bounds.bottom
+    ) {
+      celebrationGroup.remove(piece.mesh);
+      piece.mesh.material.dispose();
+      confettiPieces.splice(index, 1);
+      continue;
+    }
+
+    piece.velocity.y -= 1.1 * delta;
+    piece.velocity.z -= 0.25 * delta;
+    piece.mesh.position.x += (piece.velocity.x + Math.sin(now * 0.006 + piece.phase) * piece.sway) * delta;
+    piece.mesh.position.y += piece.velocity.y * delta;
+    piece.mesh.position.z += piece.velocity.z * delta;
+    piece.mesh.rotation.x += piece.spin.x * delta;
+    piece.mesh.rotation.y += piece.spin.y * delta;
+    piece.mesh.rotation.z += piece.spin.z * delta;
+    piece.mesh.material.opacity = THREE.MathUtils.lerp(0.92, 0, Math.max(0, progress - 0.7) / 0.3);
+  }
+}
+
+function getCameraWorldBounds(margin = 0) {
+  return {
+    left: camera.left - margin,
+    right: camera.right + margin,
+    top: -camera.bottom + margin,
+    bottom: -camera.top - margin
+  };
+}
+
 function tick(now) {
   const delta = Math.min((now - lastTime) / 1000, maxFrameDelta);
   lastTime = now;
@@ -673,6 +929,7 @@ function tick(now) {
     }
   });
 
+  updateCelebration(now, delta);
   renderer.render(scene, camera);
   animationFrameId = requestAnimationFrame(tick);
 }

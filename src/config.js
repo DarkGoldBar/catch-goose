@@ -18,12 +18,14 @@ export const trayConfig = {
   viewportPadding: 0.45
 };
 
-export const initialItemCount = 99;
-export const modelDisplayScale = 1.2;
+export const initialItemCount = 27;
+export const modelScale = 1.2;
+export const modelMaterialLightness = 1.6;
+export const modelMaterialEmissiveIntensity = 1.1;
 export const colliderPadding = 0.08;
 export const ellipsoidLatitudeSegments = 6;
 export const ellipsoidLongitudeSegments = 12;
 export const fixedTimeStep = 1 / 60;
 export const maxFrameDelta = 0.1;
-export const maxPhysicsStepsPerFrame = 4;
+export const maxPhysicsStepsPerFrame = 1;
 export const trayEulerArgs = [-Math.PI / 5, Math.PI / 4, -Math.PI / 12, 'XYZ'];

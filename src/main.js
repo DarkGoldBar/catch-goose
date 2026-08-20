@@ -1,75 +1,43 @@
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import catalog from '../assets/item-catalog.json';
 import bgmUrl from '../assets/bgm.mp3?url';
+import {
+  getDefaultTheme,
+  getRandomTheme,
+  getThemeBackgroundUrl,
+  getThemeItemTypes
+} from './assets/catalog.js';
+import { createItemMesh } from './assets/models.js';
+import { createPhysicsWorld, keepItemInsideCone } from './physics/world.js';
+import { createGameDom } from './ui/dom.js';
+import {
+  cone,
+  fixedTimeStep,
+  initialItemCount,
+  maxFrameDelta,
+  maxPhysicsStepsPerFrame,
+  trayConfig,
+  trayEulerArgs,
+  traySize
+} from './game/config.js';
+import { easeOutCubic, randomPointInCircle } from './utils/math.js';
 import './style.css';
 
+const trayEuler = new THREE.Euler(...trayEulerArgs);
+const trayQuaternion = new THREE.Quaternion().setFromEuler(trayEuler);
+
 const app = document.querySelector('#app');
-app.innerHTML = `
-  <main class="game-shell">
-    <section class="stage-wrap">
-      <canvas id="gameCanvas" aria-label="抓大鹅游戏画面"></canvas>
-      <div class="left-hud">
-        <div class="left-badge">剩余 <strong id="leftCount">0</strong></div>
-        <button id="shuffleBtn" type="button">晃一下</button>
-      </div>
-      <div class="right-hud">
-        <div class="time-badge">时间 <strong id="timeCount">0</strong>s</div>
-        <button id="restartBtn" class="restart-button" type="button">重新开始</button>
-      </div>
-      <div id="message" class="message hidden"></div>
-    </section>
-  </main>
-`;
-
-const canvas = document.querySelector('#gameCanvas');
-const leftCountEl = document.querySelector('#leftCount');
-const timeCountEl = document.querySelector('#timeCount');
-const messageEl = document.querySelector('#message');
-const modelFiles = import.meta.glob('../assets/models/**/*.glb', { eager: true, import: 'default', query: '?url' });
-const backgroundFiles = import.meta.glob('../assets/backgrounds/*.png', { eager: true, import: 'default', query: '?url' });
-const modelUrlByCatalogPath = Object.fromEntries(
-  Object.entries(modelFiles).map(([path, url]) => [path.replace('../', ''), url])
-);
-const backgroundUrlByCatalogPath = Object.fromEntries(
-  Object.entries(backgroundFiles).map(([path, url]) => [path.replace('../', ''), url])
-);
-const gltfLoader = new GLTFLoader();
-const modelCache = new Map();
-
-const traySize = 7;
-const cone = {
-  topY: 6,
-  bottomY: -4,
-  topRadius: 4,
-  bottomRadius: 0.5,
-  capPadding: 0.5,
-  itemRadius: 0.3
-};
-
-const trayConfig = {
-  y: 0.35,
-  z: 4.35,
-  spacing: 0.82,
-  slotSize: 0.68,
-  minSlotScale: 0.58,
-  viewportPadding: 0.45
-};
-const initialItemCount = 99;
-const modelDisplayScale = 1.2;
-const colliderPadding = 0.08;
-const ellipsoidLatitudeSegments = 6;
-const ellipsoidLongitudeSegments = 12;
-const fixedTimeStep = 1 / 60;
-const maxFrameDelta = 0.1;
-const maxPhysicsStepsPerFrame = 4;
-const trayQuaternion = new THREE.Quaternion().setFromEuler(
-  new THREE.Euler(-Math.PI / 5, Math.PI / 4, -Math.PI / 12, 'XYZ')
-);
+const {
+  canvas,
+  leftCount: leftCountEl,
+  message: messageEl,
+  restartButton,
+  shuffleButton,
+  timeCount: timeCountEl
+} = createGameDom(app);
 
 let itemTypes = [];
 
+let RAPIER;
 let renderer;
 let scene;
 let camera;
@@ -99,6 +67,8 @@ let trayLayout = {
 start();
 
 async function start() {
+  // loaded lazily so the large wasm bundle becomes its own chunk
+  RAPIER = (await import('@dimforge/rapier3d')).default;
   await RAPIER.init();
   init();
   await restart();
@@ -146,8 +116,8 @@ function init() {
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('pointerleave', onPointerLeave);
-  document.querySelector('#restartBtn').addEventListener('click', restart);
-  document.querySelector('#shuffleBtn').addEventListener('click', shakeCone);
+  restartButton.addEventListener('click', restart);
+  shuffleButton.addEventListener('click', shakeCone);
   resize();
 }
 
@@ -168,18 +138,16 @@ function setupBgm() {
 }
 
 function updateStageBackground() {
-  const theme = getSelectedTheme();
-  const backgroundUrl = theme?.background ? backgroundUrlByCatalogPath[theme.background] : null;
+  const backgroundUrl = getThemeBackgroundUrl(getSelectedTheme());
   canvas.parentElement.style.setProperty('--stage-background-image', backgroundUrl ? `url("${backgroundUrl}")` : 'none');
 }
 
 function getSelectedTheme() {
-  return selectedTheme || catalog.themes[0];
+  return selectedTheme || getDefaultTheme();
 }
 
 function pickRandomTheme() {
-  const themes = catalog.themes;
-  selectedTheme = themes[Math.floor(Math.random() * themes.length)] || null;
+  selectedTheme = getRandomTheme();
 }
 
 function createInvisibleShadowReceiver() {
@@ -226,52 +194,6 @@ function createTraySlots() {
   }
 }
 
-function createPhysics() {
-  world = new RAPIER.World({ x: 0, y: -9.8, z: 0 });
-
-  world.createCollider(
-    RAPIER.ColliderDesc
-      .cylinder(0.18, cone.bottomRadius + 0.35)
-      .setTranslation(0, cone.bottomY - 0.18, 0)
-      .setFriction(1.0)
-  );
-
-  world.createCollider(
-    RAPIER.ColliderDesc
-      .cylinder(0.22, cone.topRadius + 0.25)
-      .setTranslation(0, cone.topY + cone.capPadding, 0)
-      .setFriction(0.9)
-  );
-
-  const vertices = [];
-  const indices = [];
-  const segments = 80;
-
-  for (let i = 0; i < segments; i += 1) {
-    const angle = (i / segments) * Math.PI * 2;
-    vertices.push(
-      Math.cos(angle) * cone.topRadius, cone.topY, Math.sin(angle) * cone.topRadius,
-      Math.cos(angle) * cone.bottomRadius, cone.bottomY, Math.sin(angle) * cone.bottomRadius
-    );
-  }
-
-  for (let i = 0; i < segments; i += 1) {
-    const next = (i + 1) % segments;
-    const topA = i * 2;
-    const bottomA = i * 2 + 1;
-    const topB = next * 2;
-    const bottomB = next * 2 + 1;
-    indices.push(topA, topB, bottomA, topB, bottomB, bottomA);
-  }
-
-  world.createCollider(
-    RAPIER.ColliderDesc
-      .trimesh(new Float32Array(vertices), new Uint32Array(indices))
-      .setFriction(0.95)
-      .setRestitution(0.05)
-  );
-}
-
 async function restart() {
   setHighlightedItem(null);
   pressedItem = null;
@@ -287,7 +209,7 @@ async function restart() {
   updateTimer(gameStartTime);
   hideMessage();
   itemTypes = getSelectedItemTypes();
-  createPhysics();
+  world = createPhysicsWorld(RAPIER);
 
   const deck = createMatchableDeck(itemTypes.length, initialItemCount);
   deck.sort(() => Math.random() - 0.5);
@@ -303,18 +225,7 @@ async function restart() {
 }
 
 function getSelectedItemTypes() {
-  const theme = getSelectedTheme();
-  return theme.items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      modelUrl: modelUrlByCatalogPath[item.model],
-      modelScale: getCatalogModelScale(item)
-  }));
-}
-
-function getCatalogModelScale(item) {
-  const scale = Number(item.scale);
-  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+  return getThemeItemTypes(getSelectedTheme());
 }
 
 function createMatchableDeck(typeCount, itemCount) {
@@ -332,7 +243,7 @@ function createMatchableDeck(typeCount, itemCount) {
 
 async function createItem(typeIndex, x, y, z) {
   const type = itemTypes[typeIndex];
-  const mesh = await makeMesh(type);
+  const mesh = await createItemMesh(type);
   mesh.position.set(x, y, z);
   mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
   mesh.userData.typeIndex = typeIndex;
@@ -360,34 +271,6 @@ async function createItem(typeIndex, x, y, z) {
   bodies.push(item);
 }
 
-async function makeMesh(type) {
-  if (!type.modelUrl) {
-    throw new Error(`Missing model for ${type.name}.`);
-  }
-  return makeModelMesh(type);
-}
-
-async function makeModelMesh(type) {
-  let template = modelCache.get(type.modelUrl);
-  if (!template) {
-    const gltf = await gltfLoader.loadAsync(type.modelUrl);
-    template = normalizeModelTemplate(gltf.scene);
-    modelCache.set(type.modelUrl, template);
-  }
-
-  const clone = template.clone(true);
-  clone.name = type.name;
-  clone.scale.setScalar(0.82 * modelDisplayScale * type.modelScale);
-  clone.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = false;
-    }
-  });
-  clone.userData.ellipsoidCollider = buildEllipsoidColliderData(clone);
-  return clone;
-}
-
 function createItemColliderDesc(mesh) {
   const ellipsoid = mesh.userData.ellipsoidCollider;
   const desc = ellipsoid
@@ -397,86 +280,6 @@ function createItemColliderDesc(mesh) {
   return desc
     .setRestitution(0.08)
     .setFriction(0.95);
-}
-
-function normalizeModelTemplate(model) {
-  model.updateMatrixWorld(true);
-  const box = getVertexBoundsInRootSpace(model);
-  const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
-  box.getSize(size);
-  box.getCenter(center);
-  const largest = Math.max(size.x, size.y, size.z) || 1;
-
-  const root = new THREE.Group();
-  root.name = model.name || 'centered-model';
-  model.position.sub(center);
-  root.add(model);
-  root.scale.setScalar(0.9 / largest);
-  root.updateMatrixWorld(true);
-  return root;
-}
-
-function buildEllipsoidColliderData(root) {
-  const bounds = getVertexBoundsInRootSpace(root);
-  if (bounds.isEmpty()) return null;
-
-  const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
-  bounds.getSize(size);
-  bounds.getCenter(center);
-
-  const scale = root.scale;
-  const radii = new THREE.Vector3(
-    Math.max(size.x * Math.abs(scale.x) * 0.5 + colliderPadding, cone.itemRadius * 0.45),
-    Math.max(size.y * Math.abs(scale.y) * 0.5 + colliderPadding, cone.itemRadius * 0.45),
-    Math.max(size.z * Math.abs(scale.z) * 0.5 + colliderPadding, cone.itemRadius * 0.45)
-  );
-  const scaledCenter = center.multiply(scale);
-
-  const points = [];
-  points.push(scaledCenter.x, scaledCenter.y + radii.y, scaledCenter.z);
-  points.push(scaledCenter.x, scaledCenter.y - radii.y, scaledCenter.z);
-
-  for (let lat = 1; lat < ellipsoidLatitudeSegments; lat += 1) {
-    const phi = (lat / ellipsoidLatitudeSegments) * Math.PI;
-    const y = Math.cos(phi) * radii.y;
-    const ring = Math.sin(phi);
-
-    for (let lon = 0; lon < ellipsoidLongitudeSegments; lon += 1) {
-      const theta = (lon / ellipsoidLongitudeSegments) * Math.PI * 2;
-      points.push(
-        scaledCenter.x + Math.cos(theta) * ring * radii.x,
-        scaledCenter.y + y,
-        scaledCenter.z + Math.sin(theta) * ring * radii.z
-      );
-    }
-  }
-
-  return { points: new Float32Array(points) };
-}
-
-function getVertexBoundsInRootSpace(model) {
-  const box = new THREE.Box3();
-  const vertex = new THREE.Vector3();
-  const rootInverse = model.matrixWorld.clone().invert();
-  let hasVertices = false;
-
-  model.traverse((child) => {
-    if (!child.isMesh || !child.geometry?.attributes?.position) return;
-    const positions = child.geometry.attributes.position;
-
-    for (let i = 0; i < positions.count; i += 1) {
-      vertex
-        .fromBufferAttribute(positions, i)
-        .applyMatrix4(child.matrixWorld)
-        .applyMatrix4(rootInverse);
-      box.expandByPoint(vertex);
-      hasVertices = true;
-    }
-  });
-
-  return hasVertices ? box : new THREE.Box3().setFromObject(model);
 }
 
 function onPointerMove(event) {
@@ -789,15 +592,6 @@ function radiusAtY(y) {
   return THREE.MathUtils.lerp(cone.bottomRadius, cone.topRadius, t);
 }
 
-function randomPointInCircle(radius) {
-  const angle = Math.random() * Math.PI * 2;
-  const distance = Math.sqrt(Math.random()) * radius;
-  return {
-    x: Math.cos(angle) * distance,
-    z: Math.sin(angle) * distance
-  };
-}
-
 function randomDirection2() {
   const angle = Math.random() * Math.PI * 2;
   return new THREE.Vector2(Math.cos(angle), Math.sin(angle));
@@ -835,40 +629,6 @@ function getTrayItemScale(item) {
   return item.baseScale * 0.82 * trayLayout.itemScale;
 }
 
-function keepInsideCone(item) {
-  const pos = item.body.translation();
-  const vel = item.body.linvel();
-  let x = pos.x;
-  let y = THREE.MathUtils.clamp(pos.y, cone.bottomY + cone.itemRadius, cone.topY + cone.capPadding - cone.itemRadius);
-  let z = pos.z;
-  let vx = vel.x;
-  let vy = vel.y;
-  let vz = vel.z;
-  const maxRadius = Math.max(radiusAtY(y) - cone.itemRadius, 0.1);
-  const radial = Math.hypot(x, z);
-
-  if (radial > maxRadius) {
-    const nx = x / radial;
-    const nz = z / radial;
-    x = nx * maxRadius;
-    z = nz * maxRadius;
-    const outwardVelocity = vx * nx + vz * nz;
-    if (outwardVelocity > 0) {
-      vx -= outwardVelocity * nx * 1.45;
-      vz -= outwardVelocity * nz * 1.45;
-    }
-  }
-
-  if (pos.y !== y) {
-    vy = pos.y > y ? Math.min(vy, 0) : Math.max(vy, 0);
-  }
-
-  if (x !== pos.x || y !== pos.y || z !== pos.z) {
-    item.body.setTranslation({ x, y, z }, true);
-    item.body.setLinvel({ x: vx, y: vy, z: vz }, true);
-  }
-}
-
 function showMessage(text) {
   messageEl.textContent = text;
   messageEl.classList.remove('hidden');
@@ -877,10 +637,6 @@ function showMessage(text) {
 function hideMessage() {
   messageEl.textContent = '';
   messageEl.classList.add('hidden');
-}
-
-function easeOutCubic(value) {
-  return 1 - Math.pow(1 - value, 3);
 }
 
 function tick(now) {
@@ -907,7 +663,7 @@ function tick(now) {
   bodies.forEach((item) => {
     if (item.status === 'gone') return;
     if (item.status === 'active') {
-      keepInsideCone(item);
+      keepItemInsideCone(item, radiusAtY);
       const pos = item.body.translation();
       const rot = item.body.rotation();
       item.mesh.position.set(pos.x, pos.y, pos.z);

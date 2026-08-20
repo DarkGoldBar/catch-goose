@@ -18,7 +18,7 @@ export const trayConfig = {
   viewportPadding: 0.45
 };
 
-export const initialItemCount = 27;
+export const initialItemCount = 99;
 export const modelScale = 1.2;
 export const modelMaterialLightness = 1.6;
 export const modelMaterialEmissiveIntensity = 1.1;

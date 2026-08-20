@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import RAPIER from '@dimforge/rapier3d';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import catalog from '../assets/item-catalog.json';
 import bgmUrl from '../assets/bgm.mp3?url';
@@ -68,17 +68,6 @@ const trayQuaternion = new THREE.Quaternion().setFromEuler(
   new THREE.Euler(-Math.PI / 5, Math.PI / 4, -Math.PI / 12, 'XYZ')
 );
 
-const debugItemTypes = [
-  { name: '鹅', color: 0xf8f2df, accent: 0xf0b33e, shape: 'goose' },
-  { name: '苹果', color: 0xd9463e, accent: 0x7a3322, shape: 'sphere' },
-  { name: '梨', color: 0xd7dc66, accent: 0x5a8c48, shape: 'pear' },
-  { name: '包子', color: 0xf0e1c6, accent: 0xc9a06a, shape: 'bun' },
-  { name: '碗', color: 0x6aa5d8, accent: 0xffffff, shape: 'bowl' },
-  { name: '木鱼', color: 0xb96f3c, accent: 0x60351f, shape: 'capsule' },
-  { name: '萝卜', color: 0xfff4ea, accent: 0x58a75b, shape: 'carrot' },
-  { name: '金蛋', color: 0xf2c94c, accent: 0xfff0a8, shape: 'egg' },
-  { name: '方块', color: 0x7c5cff, accent: 0xf6d365, shape: 'box' }
-];
 let itemTypes = [];
 
 let renderer;
@@ -129,7 +118,7 @@ function init() {
   renderer.shadowMap.enabled = true;
 
   scene = new THREE.Scene();
-  scene.background = null;
+  scene.background = null;1
 
   camera = new THREE.OrthographicCamera(-5.4, 5.4, 5.4, -5.4, 0.1, 30);
   camera.position.set(0, 12, 0);
@@ -315,18 +304,12 @@ async function restart() {
 
 function getSelectedItemTypes() {
   const theme = getSelectedTheme();
-  return theme.items.map((item, index) => {
-    const fallback = debugItemTypes[index % debugItemTypes.length];
-    return {
+  return theme.items.map((item) => ({
       id: item.id,
       name: item.name,
-      color: fallback.color,
-      accent: fallback.accent,
-      shape: fallback.shape,
       modelUrl: modelUrlByCatalogPath[item.model],
       modelScale: getCatalogModelScale(item)
-    };
-  });
+  }));
 }
 
 function getCatalogModelScale(item) {
@@ -378,76 +361,10 @@ async function createItem(typeIndex, x, y, z) {
 }
 
 async function makeMesh(type) {
-  if (type.modelUrl) {
-    try {
-      return await makeModelMesh(type);
-    } catch (error) {
-      console.warn(`Failed to load model for ${type.name}; using debug fallback.`, error);
-    }
+  if (!type.modelUrl) {
+    throw new Error(`Missing model for ${type.name}.`);
   }
-  const group = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: type.color, roughness: 0.58, metalness: 0.03 });
-  const accent = new THREE.MeshStandardMaterial({ color: type.accent, roughness: 0.7 });
-
-  if (type.shape === 'goose') {
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 16), mat);
-    body.scale.set(1.15, 0.78, 0.9);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 18, 12), mat);
-    head.position.set(0.32, 0.25, -0.08);
-    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.18, 16), accent);
-    beak.position.set(0.48, 0.24, -0.08);
-    beak.rotation.z = -Math.PI / 2;
-    group.add(body, head, beak);
-  } else if (type.shape === 'pear') {
-    const bottom = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 16), mat);
-    const top = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 16), mat);
-    top.position.y = 0.25;
-    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.18, 12), accent);
-    leaf.position.set(0.05, 0.48, 0);
-    group.add(bottom, top, leaf);
-  } else if (type.shape === 'bun') {
-    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.38, 24, 16), mat);
-    bun.scale.set(1, 0.55, 1);
-    const fold = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.02, 8, 24), accent);
-    fold.rotation.x = Math.PI / 2;
-    fold.position.y = 0.22;
-    group.add(bun, fold);
-  } else if (type.shape === 'bowl') {
-    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.28, 0.28, 28), mat);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.035, 8, 32), accent);
-    rim.position.y = 0.15;
-    rim.rotation.x = Math.PI / 2;
-    group.add(bowl, rim);
-  } else if (type.shape === 'capsule') {
-    const capsule = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.38, 8, 18), mat);
-    capsule.rotation.z = Math.PI / 2;
-    const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.018, 8, 24), accent);
-    stripe.rotation.y = Math.PI / 2;
-    group.add(capsule, stripe);
-  } else if (type.shape === 'carrot') {
-    const root = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.65, 20), mat);
-    root.rotation.z = Math.PI;
-    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.28, 12), accent);
-    leaf.position.y = 0.42;
-    group.add(root, leaf);
-  } else if (type.shape === 'egg') {
-    const egg = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 16), mat);
-    egg.scale.set(0.8, 1.1, 0.8);
-    const shine = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 8), new THREE.MeshStandardMaterial({ color: type.accent, roughness: 0.2 }));
-    shine.position.set(0.12, 0.18, 0.18);
-    group.add(egg, shine);
-  } else {
-    group.add(new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 16), mat));
-  }
-
-  group.scale.setScalar(0.92 * modelDisplayScale);
-  group.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = false;
-    }
-  });
-  return group;
+  return makeModelMesh(type);
 }
 
 async function makeModelMesh(type) {

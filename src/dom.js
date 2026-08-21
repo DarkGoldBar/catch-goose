@@ -3,8 +3,8 @@ export function createGameDom(app) {
     <main class="game-shell">
       <section class="stage-wrap">
         <canvas id="gameCanvas" aria-label="抓大鹅游戏画面"></canvas>
-        <div id="versionBadge" class="version-badge"></div>
         <section id="loadingScreen" class="loading-screen" aria-live="polite">
+          <div id="versionBadge" class="version-badge"></div>
           <div class="loading-panel">
             <p class="loading-kicker">抓大鹅</p>
             <h1 id="loadingTitle">正在准备游戏</h1>

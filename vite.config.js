@@ -27,8 +27,8 @@ export default defineConfig({
   plugins: [
     gitVersionPlugin(),
     VitePWA({
-      registerType: 'prompt',
-      injectRegister: 'auto',
+      registerType: 'autoUpdate',
+      injectRegister: false,
       includeAssets: ['pwa-icon-192.png', 'pwa-icon-512.png'],
       manifest: {
         name: '抓大鹅',
@@ -39,7 +39,7 @@ export default defineConfig({
         scope: './',
         display: 'standalone',
         theme_color: '#253c2b',
-        background_color: '#dde7d5',
+        background_color: '#c0ef9a',
         icons: [
           {
             src: 'pwa-icon-192.png',
@@ -54,9 +54,20 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{html,js,css,png,mp3,glb,wasm}'],
+        globPatterns: ['**/*.{js,css,png,mp3,glb,wasm}'],
         maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
-        cleanupOutdatedCaches: true
+        cleanupOutdatedCaches: true,
+        navigateFallback: null,
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'navigation-cache',
+              networkTimeoutSeconds: 3
+            }
+          }
+        ]
       }
     })
   ]

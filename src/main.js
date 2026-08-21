@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import bgmUrl from '../assets/bgm.mp3?url';
+import { registerSW } from 'virtual:pwa-register';
 import {
   getDefaultTheme,
   getAllGameAssetUrls,
@@ -23,6 +24,13 @@ import {
 } from './config.js';
 import { easeOutCubic, randomPointInCircle } from './utils/math.js';
 import './style.css';
+
+registerSW({
+  immediate: true,
+  onRegisteredSW: (_swScriptUrl, registration) => {
+    registration?.update();
+  }
+});
 
 const trayEuler = new THREE.Euler(...trayEulerArgs);
 const trayQuaternion = new THREE.Quaternion().setFromEuler(trayEuler);

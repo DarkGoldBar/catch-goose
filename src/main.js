@@ -98,17 +98,14 @@ async function start() {
     RAPIER = rapierModule.default ?? rapierModule;
     if (typeof RAPIER.init === 'function') await RAPIER.init();
 
-    setLoadingState(75, '正在布置游戏', '正在创建游戏场景');
+    setLoadingState(100, '准备完成', '');
+    loadingScreenEl.classList.add('loading-screen-hidden');
+
     if (!startupInitialized) {
       init();
       startupInitialized = true;
     }
-    await restart((completed, total) => {
-      const progress = 75 + (completed / total) * 25;
-      setLoadingState(progress, '正在布置游戏', `正在放置物品 ${completed}/${total}`);
-    });
-    setLoadingState(100, '准备完成', '');
-    loadingScreenEl.classList.add('loading-screen-hidden');
+    await restart();
     startRenderLoop();
   } catch (error) {
     console.error('Failed to start the game.', error);
@@ -185,7 +182,7 @@ function init() {
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('pointerleave', onPointerLeave);
-  restartButton.addEventListener('click', restart);
+  restartButton.addEventListener('click', () => restart());
   shuffleButton.addEventListener('click', shakeCone);
   resize();
 }
@@ -264,7 +261,7 @@ function createTraySlots() {
   }
 }
 
-async function restart(onItemCreated) {
+async function restart() {
   setHighlightedItem(null);
   pressedItem = null;
   stopCelebration();
@@ -289,7 +286,6 @@ async function restart(onItemCreated) {
     const y = 2.6 + index * 0.035;
     const point = randomPointInCircle(radiusAtY(y) - 0.75);
     await createItem(typeIndex, point.x, y, point.z);
-    onItemCreated?.(index + 1, deck.length);
   }
 
   layoutTray();

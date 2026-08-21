@@ -3,6 +3,7 @@ export function createGameDom(app) {
     <main class="game-shell">
       <section class="stage-wrap">
         <canvas id="gameCanvas" aria-label="抓大鹅游戏画面"></canvas>
+        <div id="versionBadge" class="version-badge"></div>
         <section id="loadingScreen" class="loading-screen" aria-live="polite">
           <div class="loading-panel">
             <p class="loading-kicker">抓大鹅</p>
@@ -45,6 +46,7 @@ export function createGameDom(app) {
     message: app.querySelector('#message'),
     restartButton: app.querySelector('#restartBtn'),
     shuffleButton: app.querySelector('#shuffleBtn'),
-    timeCount: app.querySelector('#timeCount')
+    timeCount: app.querySelector('#timeCount'),
+    versionBadge: app.querySelector('#versionBadge')
   };
 }

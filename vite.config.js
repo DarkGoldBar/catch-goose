@@ -1,10 +1,31 @@
+import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
+function gitVersionPlugin() {
+  let version = 'dev'
+  try {
+    version = execSync('git rev-parse --short=7 HEAD').toString().trim()
+  } catch {
+    // git not available or not a repo, keep fallback
+  }
+
+  return {
+    name: 'git-version',
+    transformIndexHtml(html) {
+      return html.replace(
+        /<meta name="version" content=".*?" \/>/,
+        `<meta name="version" content="${version}" />`
+      )
+    }
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   base: "./",
   plugins: [
+    gitVersionPlugin(),
     VitePWA({
       registerType: 'prompt',
       injectRegister: 'auto',

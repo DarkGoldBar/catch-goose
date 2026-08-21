@@ -42,8 +42,11 @@ const {
   message: messageEl,
   restartButton,
   shuffleButton,
-  timeCount: timeCountEl
+  timeCount: timeCountEl,
+  versionBadge: versionBadgeEl
 } = createGameDom(app);
+
+versionBadgeEl.textContent = document.querySelector('meta[name="version"]')?.content ?? '';
 
 let itemTypes = [];
 
@@ -282,11 +285,11 @@ async function restart() {
   const deck = createMatchableDeck(itemTypes.length, initialItemCount);
   deck.sort(() => Math.random() - 0.5);
 
-  for (const [index, typeIndex] of deck.entries()) {
+  await Promise.all(deck.map((typeIndex, index) => {
     const y = 2.6 + index * 0.035;
     const point = randomPointInCircle(radiusAtY(y) - 0.75);
-    await createItem(typeIndex, point.x, y, point.z);
-  }
+    return createItem(typeIndex, point.x, y, point.z);
+  }));
 
   layoutTray();
   updateHud();

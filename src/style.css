@@ -181,6 +181,17 @@ button:hover {
   padding: 9px 12px;
 }
 
+.version-badge {
+  color: #5a6b58;
+  font-size: 11px;
+  left: max(14px, env(safe-area-inset-left));
+  opacity: 0.7;
+  padding: 0 2px;
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  z-index: 11;
+}
+
 #shuffleBtn {
   box-shadow: 0 8px 22px rgb(37 60 43 / 18%);
 }

@@ -18,6 +18,13 @@ const backgroundUrlByCatalogPath = Object.fromEntries(
   Object.entries(backgroundFiles).map(([path, url]) => [path.replace('../../', ''), url])
 );
 
+export function getAllGameAssetUrls() {
+  return [
+    ...Object.values(modelFiles),
+    ...Object.values(backgroundFiles),
+  ];
+}
+
 export function getRandomTheme() {
   const { themes } = catalog;
   return themes[Math.floor(Math.random() * themes.length)] || null;

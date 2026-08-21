@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import bgmUrl from '../assets/bgm.mp3?url';
 import {
   getDefaultTheme,
+  getAllGameAssetUrls,
   getRandomTheme,
   getThemeById,
   getThemeBackgroundUrl,
@@ -29,6 +30,14 @@ const trayQuaternion = new THREE.Quaternion().setFromEuler(trayEuler);
 const app = document.querySelector('#app');
 const {
   canvas,
+  loadingCount: loadingCountEl,
+  loadingError: loadingErrorEl,
+  loadingProgress: loadingProgressEl,
+  loadingRetry: loadingRetryButton,
+  loadingScreen: loadingScreenEl,
+  loadingStatus: loadingStatusEl,
+  loadingTitle: loadingTitleEl,
+  loadingTrack: loadingTrackEl,
   leftCount: leftCountEl,
   message: messageEl,
   restartButton,
@@ -72,17 +81,66 @@ let celebrationGeese = [];
 let confettiPieces = [];
 let confettiMaterials = [];
 let confettiGeometries = [];
+let startupInitialized = false;
 
 start();
 
 async function start() {
-  // loaded lazily so the large wasm bundle becomes its own chunk
-  const rapierModule = await import('@dimforge/rapier3d-compat');
-  RAPIER = rapierModule.default ?? rapierModule;
-  if (typeof RAPIER.init === 'function') await RAPIER.init();
-  init();
-  await restart();
-  startRenderLoop();
+  loadingRetryButton.onclick = () => window.location.reload();
+  setLoadingState(0, '正在准备游戏', '正在加载游戏资源');
+
+  try {
+    await preloadGameAssets();
+    setLoadingState(65, '正在准备物理引擎', '正在初始化游戏物理');
+
+    // Loaded lazily so the large wasm bundle becomes its own chunk.
+    const rapierModule = await import('@dimforge/rapier3d-compat');
+    RAPIER = rapierModule.default ?? rapierModule;
+    if (typeof RAPIER.init === 'function') await RAPIER.init();
+
+    setLoadingState(75, '正在布置游戏', '正在创建游戏场景');
+    if (!startupInitialized) {
+      init();
+      startupInitialized = true;
+    }
+    await restart((completed, total) => {
+      const progress = 75 + (completed / total) * 25;
+      setLoadingState(progress, '正在布置游戏', `正在放置物品 ${completed}/${total}`);
+    });
+    setLoadingState(100, '准备完成', '');
+    loadingScreenEl.classList.add('loading-screen-hidden');
+    startRenderLoop();
+  } catch (error) {
+    console.error('Failed to start the game.', error);
+    loadingTitleEl.textContent = '游戏加载失败';
+    loadingStatusEl.textContent = error instanceof Error ? error.message : '无法加载游戏资源';
+    loadingErrorEl.classList.remove('hidden');
+    loadingRetryButton.focus();
+  }
+}
+
+async function preloadGameAssets() {
+  const assetUrls = [...new Set([...getAllGameAssetUrls(), bgmUrl])];
+  let completed = 0;
+
+  setLoadingState(0, '正在加载游戏资源', `已加载 0/${assetUrls.length}`);
+  await Promise.all(assetUrls.map(async (url) => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`资源加载失败（${response.status}）：${url}`);
+    completed += 1;
+    const progress = (completed / assetUrls.length) * 65;
+    setLoadingState(progress, '正在加载游戏资源', `已加载 ${completed}/${assetUrls.length}`);
+  }));
+}
+
+function setLoadingState(progress, title, status) {
+  const normalizedProgress = Math.round(Math.max(0, Math.min(100, progress)));
+  loadingTitleEl.textContent = title;
+  loadingStatusEl.textContent = status;
+  loadingProgressEl.style.width = `${normalizedProgress}%`;
+  loadingCountEl.textContent = `${normalizedProgress}%`;
+  loadingTrackEl.setAttribute('aria-valuenow', String(normalizedProgress));
+  loadingErrorEl.classList.add('hidden');
 }
 
 function startRenderLoop() {
@@ -206,7 +264,7 @@ function createTraySlots() {
   }
 }
 
-async function restart() {
+async function restart(onItemCreated) {
   setHighlightedItem(null);
   pressedItem = null;
   stopCelebration();
@@ -231,6 +289,7 @@ async function restart() {
     const y = 2.6 + index * 0.035;
     const point = randomPointInCircle(radiusAtY(y) - 0.75);
     await createItem(typeIndex, point.x, y, point.z);
+    onItemCreated?.(index + 1, deck.length);
   }
 
   layoutTray();
